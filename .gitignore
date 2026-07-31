@@ -31,3 +31,4 @@ server/.env.local
 
 # AI
 context/*
+AGENTS.md

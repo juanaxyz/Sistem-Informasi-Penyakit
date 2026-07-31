@@ -3,6 +3,7 @@ import {
   bodyParts,
   type BodyPart as BodyPartData,
 } from "../../assets/body-parts";
+import { useDiseasesByBodyPart } from "../../hooks/useDiseasesByBodyPart";
 
 // --- Konstanta visual --------------------------------------------------
 
@@ -58,7 +59,7 @@ type BodyContainerProps = {
 
 /** Wadah body map satu sisi: overlay gambar realistis + SVG area interaktif. */
 const BodyContainer = ({ children, imageSrc }: BodyContainerProps) => (
-  <div className="relative w-[210px] h-[467px] mx-auto">
+  <div className="relative w-52.5 h-116.75 mx-auto">
     {imageSrc ? (
       <img
         src={imageSrc}
@@ -105,7 +106,7 @@ const BodySide = ({
   };
 
   return (
-    <div className="flex-1 min-w-[220px] flex flex-col items-center">
+    <div className="flex-1 min-w-55 flex flex-col items-center">
       <p className="text-center text-[12px] uppercase text-[#303030] mb-2">
         {title}
       </p>
@@ -127,6 +128,32 @@ const BodySide = ({
 
 // --- Komponen utama -----------------------------------------------------
 
+const URGENCY_STYLES = {
+  normal: "bg-emerald-100 text-emerald-700",
+  waspada: "bg-yellow-100 text-yellow-700",
+  darurat: "bg-red-100 text-red-700",
+} as const;
+
+const URGENCY_LABELS: Record<string, string> = {
+  normal: "Normal",
+  waspada: "Waspada",
+  darurat: "Darurat",
+};
+
+/** Badge kecil untuk tingkat urgensi penyakit (normal/waspada/darurat). */
+const DiseaseUrgencyBadge = ({ level }: { level?: string }) => {
+  const key = level && level in URGENCY_STYLES ? level : "normal";
+  return (
+    <span
+      className={`text-[11px] px-2 py-0.5 rounded-full ${
+        URGENCY_STYLES[key as keyof typeof URGENCY_STYLES]
+      }`}
+    >
+      {URGENCY_LABELS[key] ?? "Normal"}
+    </span>
+  );
+};
+
 export const BodyMap = () => {
   const [selectedPartId, setSelectedPartId] = useState<number | null>(null);
   const [hoveredPartId, setHoveredPartId] = useState<number | null>(null);
@@ -145,7 +172,13 @@ export const BodyMap = () => {
     return bodyParts.find((part) => part.id === selectedPartId)?.name ?? null;
   }, [selectedPartId]);
 
-  const handleClick = (id: number) => setSelectedPartId(id);
+  const { data: diseases, loading, error } = useDiseasesByBodyPart(selectedPartId);
+
+  const handleClick = (id: number) => {
+    const part = bodyParts.find((p) => p.id === id);
+    if (part) console.log("Body part diklik:", part);
+    setSelectedPartId(id);
+  };
   const handleMouseEnter = (id: number) => {
     if (IS_TOUCH_DEVICE) return;
     setHoveredPartId(id);
@@ -160,7 +193,7 @@ export const BodyMap = () => {
       <h2 className="text-center text-[13px] font-medium uppercase text-[#ff3b30]">
         {selectedPartName ?? "Klik pada bagian tubuh"}
       </h2>
-      <div className="mt-[18px] flex flex-wrap justify-center items-center gap-3">
+      <div className="mt-4.5 flex flex-wrap justify-center items-center gap-3">
         <BodySide
           title="Depan"
           imageSrc="/images/front.png"
@@ -181,6 +214,43 @@ export const BodyMap = () => {
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         />
+      </div>
+
+      <div className="mt-6 w-full max-w-md mx-auto px-4">
+        {selectedPartId === null ? (
+          <p className="text-center text-sm text-gray-500">
+            Klik pada bagian tubuh untuk melihat penyakit terkait.
+          </p>
+        ) : loading ? (
+          <p className="text-center text-sm text-gray-500">Memuat penyakit...</p>
+        ) : error ? (
+          <p className="text-center text-sm text-red-500">
+            Gagal memuat data: {error}
+          </p>
+        ) : diseases.length === 0 ? (
+          <p className="text-center text-sm text-gray-500">
+            Tidak ada penyakit terkait bagian ini.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {diseases.map((d) => (
+              <li
+                key={d.id}
+                className="border border-gray-200 rounded-lg p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-medium text-[15px]">{d.nama}</h3>
+                  <DiseaseUrgencyBadge level={d.tingkat_urgensi} />
+                </div>
+                {d.deskripsi ? (
+                  <p className="text-[13px] text-gray-600 mt-1">
+                    {d.deskripsi}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
