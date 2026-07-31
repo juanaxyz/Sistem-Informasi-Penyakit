@@ -1,0 +1,28 @@
+{
+  "name": "web-paru-paru-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "db:setup": "node scripts/db-setup.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.11.0",
+    "dotenv-cli": "^11.0.0",
+    "tsx": "^4.19.4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
+  }
+}
