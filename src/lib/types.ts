@@ -9,8 +9,26 @@
 export type Disease = {
   id: number;
   nama: string;
-  deskripsi?: string;
+  ringkasan?: string | null; // kolom TEXT di DB bisa bernilai null
   tingkat_urgensi?: string;
+};
+
+/** Satu blok konten edukasi (`konten_penyakit`) di dalam detail penyakit. */
+export type DiseaseContent = {
+  id: number;
+  judul: string;
+  slug: string;
+  isi: string;
+  urutan: number;
+};
+
+/** Satu referensi/sumber (`referensi`) di dalam detail penyakit. */
+export type Reference = {
+  id: number;
+  judul: string;
+  sumber?: string | null;
+  url?: string | null;
+  tahun?: number | null;
 };
 
 /** Detail lengkap satu penyakit (hasil `GET /api/diseases/:id`). */
@@ -19,14 +37,12 @@ export type DiseaseDetail = {
   id_sistem_tubuh: number;
   nama: string;
   slug: string;
-  deskripsi?: string | null;
-  gejala?: string | null;
-  penyebab?: string | null;
-  pengobatan?: string | null;
-  pencegahan?: string | null;
-  komplikasi?: string | null;
-  kapan_harus_ke_dokter?: string | null;
+  ringkasan?: string | null;
   tingkat_urgensi?: string;
+  sistem_tubuh: BodySystem | null;
+  konten: DiseaseContent[];
+  bagian_tubuh: BodyPartRecord[];
+  referensi: Reference[];
 };
 
 /** Satu baris dari tabel `sistem_tubuh` (hasil `GET /api/body-systems`). */

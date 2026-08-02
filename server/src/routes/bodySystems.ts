@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { query } from '../config/dbClient';
 import { asyncHandler } from '../utils/asyncHandler';
 import { parseIdParam } from '../utils/params';
+import { listBodySystems, listDiseasesBySystem } from '../repositories/bodySystemsRepo';
 
 export const bodySystemsRouter = Router();
 
@@ -9,10 +9,7 @@ export const bodySystemsRouter = Router();
 bodySystemsRouter.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const { rows } = await query(
-      'SELECT id, nama, slug, deskripsi FROM sistem_tubuh ORDER BY id'
-    );
-    res.json(rows);
+    res.json(await listBodySystems());
   })
 );
 
@@ -22,13 +19,6 @@ bodySystemsRouter.get(
   asyncHandler(async (req, res) => {
     const systemId = parseIdParam(req.params.systemId, 'ID sistem tubuh');
 
-    const { rows } = await query(
-      `SELECT d.id, d.nama, d.deskripsi, d.tingkat_urgensi
-       FROM penyakit d
-       WHERE d.id_sistem_tubuh = $1
-       ORDER BY d.nama`,
-      [systemId]
-    );
-    res.json(rows);
+    res.json(await listDiseasesBySystem(systemId));
   })
 );

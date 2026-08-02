@@ -7,17 +7,19 @@
 
 ## 1. Status arsitektur saat ini
 
-- **FASE 0 selesai.** `App.tsx` hanya merender `<BodyMap />` yang memakai data
-  statis `src/assets/body-parts.ts`.
-- **Lapisan data sudah dibangun lengkap** meski belum dipakai komponen:
+- **FASE 0–3 selesai.** `App.tsx` merender `<BodyMap />` yang sudah **terhubung ke
+  API**: klik bagian tubuh memanggil `useDiseasesByBodyPart` dan menampilkan
+  daftar penyakit (nama, ringkasan, tingkat_urgensi) dengan state
+  loading/error/empty. Geometri SVG tetap dari `src/assets/body-parts.ts`.
+- **Lapisan data lengkap dan terpakai:**
   - `src/lib/api.ts` — helper fetch ke Express API,
   - `src/lib/types.ts` — tipe respons API bersama,
   - `src/hooks/useFetch.ts` — hook fetch generik,
   - 6 hooks domain di `src/hooks/`.
-- **Backend Express + PostgreSQL sudah berjalan** di `server/` (port 4000),
-  semua router di-mount di bawah `/api` (lihat `server/src/app.ts`).
-- **Supabase belum diimplementasikan** — hanya rencana di `context/TASKS.md`
-  (FASE 1). Jangan tulis dokumentasi seolah-olah sudah live.
+- **Backend memakai Express + PostgreSQL lokal** di `server/` (port 4000) —
+  keputusan final (01 Aug 2026). Semua router di-mount di bawah `/api`
+  (lihat `server/src/app.ts`). **Supabase tidak digunakan** (rencana lama
+  dibatalkan).
 
 ## 2. Lapisan arsitektur
 
@@ -42,19 +44,23 @@
                            ▼
 ┌────────────────────────────────────────────────────────────┐
 │ src/lib/api.ts — API_BASE + api() + isAbortError()         │
-│ fetch(`${API_BASE}${path}`), lempar Error bila bukan 2xx   │
+│ fetch(`${API_BASE}${path}`); error → pakai {error:{message}}│
+│ dari body server (fallback `API <path> failed: <status>`)  │
 └──────────────────────────┬─────────────────────────────────┘
                            │  HTTP GET (MVP read-only)
                            ▼
 ┌────────────────────────────────────────────────────────────┐
 │ Express API — server/src/app.ts (base /api)                │
-│ routes: bodyParts, bodySystems, diseases, search           │
+│ routes: bodyParts, bodySystems, diseases, search, health   │
+│ SQL terpusat di server/src/repositories/, env di           │
+│ config/env.ts, + /api/health (cek DB)                      │
 └──────────────────────────┬─────────────────────────────────┘
                            │  query() terparameterisasi (pg.Pool)
                            ▼
 ┌────────────────────────────────────────────────────────────┐
-│ PostgreSQL (tabel diseases, body_parts, body_systems,      │
-│            disease_body_part, disease_body_system)         │
+│ PostgreSQL (tabel sistem_tubuh, bagian_tubuh, penyakit,                │
+│            konten_penyakit, gambar_konten, penyakit_bagian_tubuh,      │
+│            referensi)                                                  │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,17 +78,20 @@ Aturan pemisahan yang dijaga:
 export const API_BASE: string;
 export const api = async <T>(path: string, options?: RequestInit): Promise<T>;
 export const isAbortError = (error: unknown): boolean;
+export const fetchDiseasesByBodyPart = (bodyPartId: number): Promise<Disease[]>;
 ```
 
 | Ekspor | Fungsi |
 |---|---|
 | `API_BASE` | Base URL API. Default `/api`. Bila env `VITE_API_URL` diisi, menjadi `${VITE_API_URL}/api`. Seluruh path di hooks ditulis **tanpa** prefix `/api`. |
-| `api<T>(path, options)` | `fetch(`${API_BASE}${path}`, options)`. Bila respons tidak 2xx → melempar `Error` dengan status HTTP. Bila sukses → parse JSON sebagai `T`. |
+| `api<T>(path, options)` | `fetch(`${API_BASE}${path}`, options)`. Bila respons tidak 2xx → mencoba parse body error `{ error: { message } }` dan melempar `Error(message)`; bila body bukan JSON/format lain → fallback `API <path> failed: <status>`. Bila sukses → parse JSON sebagai `T`. |
 | `isAbortError(error)` | Deteksi error akibat `AbortController.abort()` (berguna di `useFetch` agar pembatalan request tidak dianggap error sungguhan). |
+| `fetchDiseasesByBodyPart(bodyPartId)` | Helper legacy `GET /diseases/by-body-part/:id`. **Tidak dipakai komponen** (aturan layer: UI hanya lewat hooks — pakai `useDiseasesByBodyPart`); tersedia untuk skrip/tooling. |
 
 Kenapa dipusatkan di sini:
 - **Satu titik** untuk mengubah base URL / menambah header (auth, dsb.).
-- Pesan error konsisten: `API <path> failed: <status>`.
+- Pesan error konsisten: dari body server `{ error: { message } }`, fallback
+  `API <path> failed: <status>`.
 
 ## 4. `src/lib/types.ts` — tipe respons API bersama
 
@@ -92,15 +101,17 @@ Indonesia.
 
 | Tipe | Dipakai untuk | Field |
 |---|---|---|
-| `Disease` | Daftar/pencarian penyakit (`/diseases/by-body-part/:id`, `/body-systems/:id/diseases`, `/search`) | `id`, `nama`, `deskripsi?`, `tingkat_urgensi?` |
-| `DiseaseDetail` | Detail satu penyakit (`/diseases/:id`) | `id`, `nama`, `deskripsi`, `penyebab?`, `pencegahan?`, `pengobatan?`, `kapan_ke_dokter?`, `tingkat_urgensi?` |
-| `BodySystem` | Daftar sistem tubuh (`/body-systems`) | `id`, `nama`, `deskripsi?` |
-| `BodyPartRecord` | Daftar bagian tubuh (`/body-parts/filter`) | `id`, `nama`, `kode_svg`, `side` (`'depan'|'belakang'`), `gender` (`'pria'|'wanita'|'netral'`), `deskripsi?` |
+| `Disease` | Daftar/pencarian penyakit (`/diseases/by-body-part/:id`, `/body-systems/:id/diseases`, `/search`) | `id`, `nama`, `ringkasan?: string \| null`, `tingkat_urgensi?` |
+| `DiseaseDetail` | Detail satu penyakit (`/diseases/:id`) | `id`, `id_sistem_tubuh`, `nama`, `slug`, `ringkasan?: string \| null`, `tingkat_urgensi?`, `sistem_tubuh: BodySystem \| null`, `konten: DiseaseContent[]`, `bagian_tubuh: BodyPartRecord[]`, `referensi: Reference[]` |
+| `DiseaseContent` | Blok konten edukasi (`konten_penyakit`) di dalam detail | `id`, `judul`, `slug`, `isi`, `urutan` |
+| `Reference` | Referensi/sumber (`referensi`) di dalam detail | `id`, `judul`, `sumber?`, `url?`, `tahun?` |
+| `BodySystem` | Daftar sistem tubuh (`/body-systems`) | `id`, `nama`, `slug`, `deskripsi?` |
+| `BodyPartRecord` | Daftar bagian tubuh (`/body-parts/filter`) | `id`, `nama`, `slug`, `tampilan` (`'depan'\|'belakang'`) |
 
 Catatan: `BodyPartRecord` (dari database) **berbeda** dari `BodyPart`
 (dari `src/assets/body-parts.ts`). `BodyPart` statis punya field `face` dan `d`
-(path SVG); `BodyPartRecord` punya `side`, `gender`, dan `kode_svg`. Keduanya
-tidak boleh dicampur.
+(path SVG); `BodyPartRecord` punya `slug` dan `tampilan`. Keduanya tidak boleh
+dicampur.
 
 ## 5. `useFetch` — hook fetch generik
 
@@ -155,17 +166,17 @@ dibuat terhadap kontrak ini tidak perlu diubah saat sumber data diganti).
 
 | Hook | Endpoint (`API_BASE` + path) | Path yang dikirim | Tipe `data` | Opsi `useFetch` | Catatan |
 |---|---|---|---|---|---|
-| `useBodyParts(side?, gender?)` | `GET /body-parts/filter` | `/body-parts/filter?side=...&gender=...` (query hanya untuk argumen yang diisi) | `BodyPartRecord[]` | `{ initialLoading: true }` | Nilai `side`/`gender` mengikuti isi tabel `body_parts` (mis. `side="depan"`, `gender="pria"`). |
+| `useBodyParts(tampilan?)` | `GET /body-parts/filter` | `/body-parts/filter?tampilan=depan|belakang` (query hanya untuk argumen yang diisi) | `BodyPartRecord[]` | `{ initialLoading: true }` | Nilai `tampilan` mengikuti isi tabel `bagian_tubuh` (mis. `tampilan="depan"`). |
 | `useBodySystems()` | `GET /body-systems` | `/body-systems` (tetap) | `BodySystem[]` | `{ initialLoading: true }` | — |
 | `useDiseasesByBodyPart(bodyPartId)` | `GET /diseases/by-body-part/:id` | `null` bila `bodyPartId` adalah `null`/`undefined` | `Disease[]` | default | Null-skip: selama id belum terpilih, tidak ada request. |
 | `useDiseasesByBodySystem(systemId)` | `GET /body-systems/:id/diseases` | `null` bila `systemId` adalah `null`/`undefined` | `Disease[]` | default | Null-skip seperti di atas. |
 | `useDiseaseDetail(diseaseId)` | `GET /diseases/:id` | `null` bila `diseaseId` adalah `null`/`undefined` | `DiseaseDetail \| null` | default | Inisial `data = null`; server mengembalikan `null` bila penyakit tidak ditemukan. |
 | `useSearchDiseases(query)` | `GET /search?q=...` | `null` bila `query.trim()` kosong; selain itu `/search?q=<encodeURIComponent(q)>` | `Disease[]` | `{ delayMs: 300, resetOnNull: true, clearDataOnError: true }` | Return `{ data, loading, error, activeQuery }`. `activeQuery` selalu sama dengan `query.trim()` — merepresentasikan query yang sedang aktif (hasil `data` berlaku untuk query ini). |
 
-Contoh pemakaian (gaya FASE 3+, bukan implementasi saat ini):
+Contoh pemakaian (gaya FASE 4+, bukan implementasi saat ini):
 
 ```tsx
-const { data: parts, loading, error } = useBodyParts('depan', 'pria');
+const { data: parts, loading, error } = useBodyParts('depan');
 const { data: diseases } = useDiseasesByBodyPart(selectedPartId);
 const { data: results, activeQuery } = useSearchDiseases(text);
 ```
@@ -181,7 +192,7 @@ tetap tersedia per konvensi `AGENTS.md`).
 | Konstanta | Nilai | Makna |
 |---|---|---|
 | `SVG_VIEWBOX` | `'0 0 375.42 832.97'` | Area gambar SVG, dipakai kedua sisi body map. |
-| `PART_COLORS` | `default: 'rgba(75,75,77,.2)'`, `hovered: 'rgb(85,85,87)'`, `selected: 'rgba(255,59,48,.2)'` | Warna isian tiap bagian tubuh per status interaksi. |
+| `PART_COLORS` | `default: 'rgba(203,213,225,.85)'`, `hovered: 'rgba(96,165,250,.9)'`, `selected: 'rgba(37,99,235,1)'` | Warna isian tiap bagian tubuh per status interaksi (skema biru). |
 | `IS_TOUCH_DEVICE` | `typeof window !== 'undefined' && 'ontouchstart' in window` | Deteksi perangkat touch saat runtime. |
 
 ### Sub-komponen stateless
@@ -199,8 +210,12 @@ tetap tersedia per konvensi `AGENTS.md`).
   (`'ant'` = depan, `'post'` = belakang) — di-memo dengan `useMemo`.
 - `selectedPartName`: nama bagian yang terpilih, untuk judul header
   (fallback: "Klik pada bagian tubuh").
+- **Data penyakit (FASE 3):** `useDiseasesByBodyPart(selectedPartId)` dipanggil
+  langsung di komponen; `selectedPartId === null` → hook tidak melakukan request
+  (null-skip). Hasil dirender sebagai daftar (`nama`, `ringkasan`, badge
+  `tingkat_urgensi`) lengkap dengan state loading / error / empty.
 - Event handling:
-  - klik → `setSelectedPartId(id)`,
+  - klik → `setSelectedPartId(id)` (memicu request penyakit terkait),
   - `onMouseEnter`/`onMouseLeave` → set/reset `hoveredPartId`,
   - **perangkat touch**: handler hover langsung `return` bila
     `IS_TOUCH_DEVICE` true (perangkat touch tidak punya event hover, jadi
@@ -222,12 +237,14 @@ export type BodyPart = {
   menggeser area klik relatif terhadap overlay `front.png`/`back.png`.
 - Perubahan kosmetik (mis. nama, warna) boleh lewat komponen; perubahan
   geometri hanya boleh disengaja dan diverifikasi visual.
-- Di FASE 3 (`context/TASKS.md`), sumber data ini akan **diganti** dengan
-  fetch dari `useBodyParts` — bukan diedit.
+- Di FASE 3, **geometri SVG TIDAK diganti** dengan fetch — DB `bagian_tubuh`
+  tidak menyimpan path SVG. Yang di-wire hanya `useDiseasesByBodyPart`
+  (klik → daftar penyakit). Jangan pernah mengganti `body-parts.ts` dengan
+  data dari API.
 
 ## 8. Alur data end-to-end
 
-Contoh skenario "klik bagian tubuh → daftar penyakit" (FASE 3+):
+Contoh skenario "klik bagian tubuh → daftar penyakit" (FASE 3, sudah berjalan):
 
 ```
 User klik <path> di BodyMap
@@ -243,8 +260,11 @@ fetch(`${API_BASE}/diseases/by-body-part/${id}`)
    │   API_BASE = /api        (atau VITE_API_URL + /api)
    ▼
 Express: /api/diseases/by-body-part/:bodyPartId   (server/src/routes/diseases.ts)
-   │ query('SELECT d.id, d.nama, ... FROM diseases d
-   │       JOIN disease_body_part dbp ... WHERE dbp.body_part_id = $1', [id])
+   │ SQL dipusatkan di server/src/repositories/diseasesRepo.ts
+   │ query('SELECT d.id, d.nama, d.ringkasan, d.tingkat_urgensi
+   │        FROM penyakit d
+   │        JOIN penyakit_bagian_tubuh pbt ON pbt.id_penyakit = d.id
+   │        WHERE pbt.id_bagian_tubuh = $1', [id])
    ▼
 PostgreSQL ──rows──▶ res.json(rows)
    │
@@ -256,12 +276,12 @@ useFetch setData(json)  →  data: Disease[]  →  UI render daftar penyakit
 
 | Fase | Rencana | Titik sambung di kode ini |
 |---|---|---|
-| FASE 1 — Setup Supabase | Install `@supabase/supabase-js`, buat `src/lib/supabaseClient.ts`, `.env.example`, tabel per `context/DATABASE.md`, RLS, data dummy. | Belum ada. `src/lib/supabaseClient.ts` belum dibuat; **jangan dokumentasikan sebagai live**. |
-| FASE 2 — Data layer hooks | Semua akses data wajib lewat `src/hooks/`. | Hooks domain **sudah ada** dan memenuhi kontrak `{ data, loading, error }`. Apabila sumber data nanti berganti dari Express ke Supabase, perubahannya cukup di dalam hooks (dan `useFetch`/`api`), **tanpa** mengubah komponen UI. |
-| FASE 3 — Integrasi body map | Ganti `bodyParts` statis dengan `useBodyParts(side, gender)`; klik bagian tubuh memanggil `useDiseasesByBodyPart`. | BodyMap saat ini masih impor `body-parts.ts` langsung; pemasangan hooks dilakukan di fase ini. |
-| FASE 4 — Pencarian & sistem tubuh | UI search memakai `useSearchDiseases` (debounce 300ms sudah ada di hook); daftar sistem tubuh memakai `useBodySystems`; klik sistem → `useDiseasesByBodySystem`. | Semua hook sudah siap dipakai. |
+| FASE 1 — Backend & DB | Express API + PostgreSQL lokal (keputusan final; Supabase dibatalkan). | **Selesai.** Server di `server/`, skema Indonesia, data dummy termigrasi, semua route hidup. |
+| FASE 2 — Data layer hooks | Semua akses data wajib lewat `src/hooks/`. | Hooks domain **sudah ada** dan memenuhi kontrak `{ data, loading, error }`. Perubahan sumber data (jika ada) cukup di dalam hooks — komponen UI tidak berubah. |
+| FASE 3 — Integrasi body map | Klik bagian tubuh memanggil `useDiseasesByBodyPart`. | **Selesai.** Geometri tetap dari `body-parts.ts`; daftar penyakit dirender di bawah body map. |
+| FASE 4 — Pencarian & sistem tubuh | UI search memakai `useSearchDiseases` (debounce 300ms sudah ada di hook); daftar sistem tubuh memakai `useBodySystems`; klik sistem → `useDiseasesByBodySystem`. | Belum ada UI; semua hook sudah siap dipakai. Build di `App.tsx` (routing belum boleh sampai FASE 5). |
 | FASE 5 — Routing | `react-router-dom`, halaman detail via `useDiseaseDetail`. | Belum ada (`App.tsx` hanya BodyMap). |
-| FASE 6 — Polish | Empty/loading/error state, responsive 375/768/1280px, README. | — |
+| FASE 6 — Polish | Empty/loading/error state, responsive 375/768/1280px, README. | Sebagian sudah ada di `BodyMap` (loading/error/empty). |
 
 Poin kunci: **kontrak `{ data, loading, error }` adalah seam (sambungan)
 yang stabil.** Komponen yang dibangun sekarang terhadap kontrak ini akan tetap

@@ -11,3 +11,15 @@ export class HttpError extends Error {
     this.status = status;
   }
 }
+
+/** Error 404: resource/path yang diminta tidak ditemukan. */
+export class NotFoundError extends HttpError {
+  constructor(message = 'Data tidak ditemukan.') {
+    super(404, message);
+    this.name = 'NotFoundError';
+  }
+}
+
+/** Helper singkat untuk melempar NotFoundError. */
+export const notFound = (message = 'Data tidak ditemukan.'): NotFoundError =>
+  new NotFoundError(message);

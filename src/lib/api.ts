@@ -13,10 +13,21 @@ export const API_BASE = (() => {
   return customUrl ? `${customUrl}/api` : '/api';
 })();
 
-/** Fetch ke API; melempar `Error` bila respons tidak 2xx, lalu mengembalikan JSON. */
+/** Fetch ke API; melempar `Error` bila respons bukan 2xx, lalu mengembalikan JSON. */
 export const api = async <T = unknown>(path: string, options?: RequestInit): Promise<T> => {
   const res = await fetch(`${API_BASE}${path}`, options);
-  if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+  if (!res.ok) {
+    // Kontrak error server: `{ error: { message } }`. Coba ambil pesannya;
+    // fallback ke pesan generik bila body bukan JSON atau formatnya berbeda.
+    let message = `API ${path} failed: ${res.status}`;
+    try {
+      const body = (await res.json()) as { error?: { message?: unknown } };
+      if (typeof body?.error?.message === 'string') message = body.error.message;
+    } catch {
+      // Body kosong / bukan JSON — pakai pesan default di atas.
+    }
+    throw new Error(message);
+  }
   return res.json() as Promise<T>;
 };
 

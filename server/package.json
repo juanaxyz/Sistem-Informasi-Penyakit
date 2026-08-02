@@ -6,12 +6,14 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "db:setup": "node scripts/db-setup.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^5.2.1",
+    "helmet": "^8.3.0",
     "pg": "^8.16.0"
   },
   "devDependencies": {
@@ -19,8 +21,11 @@
     "@types/express": "^5.0.0",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.11.0",
+    "@types/supertest": "^7.2.1",
     "dotenv-cli": "^11.0.0",
-    "tsx": "^4.19.4"
+    "supertest": "^7.2.2",
+    "tsx": "^4.19.4",
+    "vitest": "^4.1.10"
   },
   "allowScripts": {
     "esbuild@0.28.1": true

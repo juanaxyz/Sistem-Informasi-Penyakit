@@ -175,8 +175,7 @@ export const BodyMap = () => {
   const { data: diseases, loading, error } = useDiseasesByBodyPart(selectedPartId);
 
   const handleClick = (id: number) => {
-    const part = bodyParts.find((p) => p.id === id);
-    if (part) console.log("Body part diklik:", part);
+    bodyParts.find((p) => p.id === id);
     setSelectedPartId(id);
   };
   const handleMouseEnter = (id: number) => {
@@ -242,9 +241,9 @@ export const BodyMap = () => {
                   <h3 className="font-medium text-[15px]">{d.nama}</h3>
                   <DiseaseUrgencyBadge level={d.tingkat_urgensi} />
                 </div>
-                {d.deskripsi ? (
+                {d.ringkasan ? (
                   <p className="text-[13px] text-gray-600 mt-1">
-                    {d.deskripsi}
+                    {d.ringkasan}
                   </p>
                 ) : null}
               </li>

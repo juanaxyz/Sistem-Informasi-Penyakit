@@ -8,8 +8,8 @@
  * - Membaca semua file `*.sql` di `migrations/` (urut sesuai nama file).
  * - Mencatat migrasi yang sudah terpasang di tabel `schema_migrations`.
  * - Setiap file migrasi dijalankan dalam satu transaksi (all-or-nothing).
- * - Jika tabel inti (diseases/body_parts/body_systems) sudah ada di database
- *   lama, migrasi yang ada ditandai sebagai baseline (tidak dijalankan ulang).
+ * - Jika tabel inti (sistem_tubuh/penyakit) sudah ada di database,
+ *   migrasi yang ada ditandai sebagai baseline (tidak dijalankan ulang).
  */
 import 'dotenv/config';
 import { readdir, readFile } from 'node:fs/promises';
@@ -46,7 +46,7 @@ const coreTablesExist = async () => {
     `SELECT COUNT(*)::int AS count
      FROM pg_class c
      JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname = 'public' AND c.relname IN ('diseases', 'body_parts', 'body_systems')`
+     WHERE n.nspname = 'public' AND c.relname IN ('sistem_tubuh', 'penyakit')`
   );
   return rows[0].count > 0;
 };
