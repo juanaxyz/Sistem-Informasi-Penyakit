@@ -56,13 +56,27 @@ export interface ReferensiRow {
   tahun: number | null;
 }
 
+/** Baris tabel `gambar_konten`. */
+export interface GambarKontenRow {
+  id: number;
+  id_konten: number;
+  url_gambar: string;
+  caption: string | null;
+  urutan: number;
+}
+
+/** Blok konten edukasi beserta gambarnya. */
+export interface KontenRowWithImages extends KontenRow {
+  gambar_konten: GambarKontenRow[];
+}
+
 /**
  * Shape detail penyakit seperti yang dikembalikan endpoint
  * GET /api/diseases/:id saat ini — persis, tidak diubah.
  */
 export interface DiseaseDetailResult extends DiseaseRow {
   sistem_tubuh: BodySystemRow | null;
-  konten: KontenRow[];
+  konten: KontenRowWithImages[];
   bagian_tubuh: BodyPartRow[];
   referensi: ReferensiRow[];
 }

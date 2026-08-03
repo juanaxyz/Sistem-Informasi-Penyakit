@@ -7,6 +7,7 @@ import type {
   DiseaseSummaryRow,
   KontenRow,
   ReferensiRow,
+  GambarKontenRow,
 } from './types';
 
 /** Ambil ringkasan penyakit terkait satu bagian tubuh (urut berdasarkan nama). */
@@ -24,11 +25,10 @@ export const listDiseasesByBodyPart = async (bodyPartId: number): Promise<Diseas
 
 /**
  * Detail satu penyakit lengkap: `{ ...penyakit, sistem_tubuh, konten,
- * bagian_tubuh, referensi }`. Mengembalikan null bila penyakit tidak ditemukan.
- * Query dijalankan paralel (Promise.all) seperti implementasi route sebelumnya.
+ * bagian_tubuh, referensi, gambar_konten }`. Mengembalikan null bila penyakit tidak ditemukan.
  */
 export const getDiseaseDetail = async (id: number): Promise<DiseaseDetailResult | null> => {
-  const [diseaseRes, sistemRes, kontenRes, bagianRes, referensiRes] = await Promise.all([
+  const [diseaseRes, sistemRes, kontenRes, bagianRes, referensiRes, gambarRes] = await Promise.all([
     query<DiseaseRow>(
       `SELECT id, id_sistem_tubuh, nama, slug, ringkasan, tingkat_urgensi
        FROM penyakit
@@ -64,6 +64,15 @@ export const getDiseaseDetail = async (id: number): Promise<DiseaseDetailResult 
        ORDER BY id`,
       [id]
     ),
+    query<GambarKontenRow>(
+      `SELECT id, id_konten, url_gambar, caption, urutan
+       FROM gambar_konten
+       WHERE id_konten IN (
+         SELECT id FROM konten_penyakit WHERE id_penyakit = $1 AND tampilkan = true
+       )
+       ORDER BY urutan`,
+      [id]
+    ),
   ]);
 
   const disease = diseaseRes.rows[0];
@@ -71,10 +80,24 @@ export const getDiseaseDetail = async (id: number): Promise<DiseaseDetailResult 
     return null;
   }
 
+  const konten = kontenRes.rows;
+
+  const gambarByKonten = gambarRes.rows.reduce<Record<number, GambarKontenRow[]>>((acc, item) => {
+    const key = item.id_konten;
+    acc[key] = acc[key] ?? [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
+  const kontenDenganGambar = konten.map((k) => ({
+    ...k,
+    gambar_konten: gambarByKonten[k.id] ?? [],
+  }));
+
   return {
     ...disease,
     sistem_tubuh: sistemRes.rows[0] ?? null,
-    konten: kontenRes.rows,
+    konten: kontenDenganGambar,
     bagian_tubuh: bagianRes.rows,
     referensi: referensiRes.rows,
   };
