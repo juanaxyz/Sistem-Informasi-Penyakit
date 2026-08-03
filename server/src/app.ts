@@ -11,6 +11,14 @@ import { createApiRouter } from './routes';
 export const createApp = (): Express => {
   const app = express();
 
+  // API JSON tidak di-cache kondisional: matikan ETag agar browser tidak
+  // mengirim If-None-Match dan menerima 304 tanpa body (mengacaukan fetch).
+  app.disable('etag');
+  app.use((_req, res, next) => {
+    res.set('Cache-Control', 'no-cache');
+    next();
+  });
+
   // Keamanan dasar + parsing body
   app.use(helmet());
   app.use(cors());
