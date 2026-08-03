@@ -12,7 +12,7 @@ export const useDiseasesByBodyPart = (bodyPartId: number | null) => {
     async (signal: AbortSignal): Promise<Disease[]> => {
       const { data, error } = await supabase
         .from('penyakit')
-        .select('id,nama,ringkasan,tingkat_urgensi')
+        .select('id,nama,ringkasan,tingkat_urgensi,penyakit_bagian_tubuh!inner(id_bagian_tubuh)')
         .eq('penyakit_bagian_tubuh.id_bagian_tubuh', bodyPartId)
         .order('nama')
         .abortSignal(signal);
