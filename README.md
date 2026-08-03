@@ -188,22 +188,26 @@ PostgreSQL
 Kontrak tiap hook stabil: **`{ data, loading, error }`** (khusus pencarian
 ditambah `activeQuery`). Detail lengkap: `context/frontend-architecture.md`.
 
-Endpoint yang tersedia (semua `GET`, MVP read-only):
+Endpoint yang tersedia (semua `GET`, MVP read-only) — **kontrak lengkap dan
+final ada di `context/ROUTES.md`** (single source of truth; jangan mengubah
+route tanpa memperbarui file tersebut):
 
 | Endpoint | Fungsi |
 |---|---|
 | `/api/health` | Status API + koneksi database (200 `{ status: 'ok', database: 'up' }`; 503 bila DB down) |
-| `/api/body-parts/filter?tampilan=depan|belakang` | Bagian tubuh (filter opsional) |
+| `/api/body-parts` | Semua bagian tubuh |
+| `/api/body-parts/filter?tampilan=depan\|belakang` | Bagian tubuh (filter opsional) |
 | `/api/body-systems` | Sistem tubuh |
 | `/api/body-systems/:id/diseases` | Penyakit pada satu sistem tubuh |
 | `/api/diseases/by-body-part/:id` | Penyakit terkait satu bagian tubuh |
-| `/api/diseases/:id` | Detail penyakit (`null` bila tidak ada; termasuk `sistem_tubuh`, `konten[]`, `bagian_tubuh[]`, `referensi[]`) |
+| `/api/diseases/:id` | Detail penyakit (`null` bila tidak ada; termasuk `sistem_tubuh`, `konten[]` + `gambar_konten[]`, `bagian_tubuh[]`, `referensi[]`) |
 | `/api/search?q=` | Pencarian nama/ringkasan penyakit |
+| `/api/uploads/penyakit/:file` | File gambar konten edukasi (dipakai `gambar_konten.url_gambar`) |
 
 Respons error konsisten `{ error: { message } }` (mis. 404 untuk endpoint
 tidak dikenal). Nama endpoint memakai kebab-case canonical — alias legacy
-(`/api/bodyParts`, `/api/bodySystems`, `/api/diseases` tanpa prefix, `/api/search`
-kuno) **tidak lagi tersedia** (404).
+(`/api/bodyParts`, `/api/bodySystems`, `/api/diseases` tanpa prefix, `/api/v1/*`)
+**tidak tersedia** (404) dan tidak akan dihidupkan kembali.
 
 ## Roadmap
 
@@ -221,6 +225,7 @@ Lihat `context/TASKS.md` untuk detail acceptance criteria tiap fase:
 | Dokumen | Isi |
 |---|---|
 | `context/frontend-architecture.md` | Arsitektur frontend pasca-refactor |
+| `context/ROUTES.md` | Kontrak route API & frontend (single source of truth) |
 | `server/README.md` | Dokumentasi backend (setup, migrasi, endpoint) |
 | `context/PRD.md` | Kebutuhan produk |
 | `context/PROJECT.md` | Stack & struktur folder |

@@ -130,8 +130,12 @@ berupa `{ "error": { "message": "..." } }`.
 | GET | `/api/body-systems` | Semua sistem tubuh |
 | GET | `/api/body-systems/:systemId/diseases` | Penyakit pada satu sistem tubuh |
 | GET | `/api/diseases/by-body-part/:bodyPartId` | Penyakit terkait satu bagian tubuh |
-| GET | `/api/diseases/:id` | Detail penyakit: `{...penyakit, sistem_tubuh, konten[], bagian_tubuh[], referensi[]}` (`null` bila tidak ditemukan) |
+| GET | `/api/diseases/:id` | Detail penyakit: `{...penyakit, sistem_tubuh, konten[] (+ gambar_konten[]), bagian_tubuh[], referensi[]}` (`null` bila tidak ditemukan) |
 | GET | `/api/search?q=` | Cari penyakit berdasarkan `nama`/`ringkasan` (LIKE case-insensitive, max 50) |
+| GET | `/api/uploads/penyakit/:file` | File gambar konten edukasi dari `uploads/penyakit` (statis; dipakai `gambar_konten.url_gambar`) |
+
+> **Kontrak route lengkap & final: `../context/ROUTES.md`** (single source of
+> truth). Jangan mengubah route tanpa memperbarui file itu.
 
 Kolom yang dipakai di respons ringkas: `id`, `nama`, `ringkasan`,
 `tingkat_urgensi` (`normal`/`waspada`/`darurat`).

@@ -20,6 +20,9 @@
   keputusan final (01 Aug 2026). Semua router di-mount di bawah `/api`
   (lihat `server/src/app.ts`). **Supabase tidak digunakan** (rencana lama
   dibatalkan).
+- **Route adalah kontrak** — daftar lengkap API & frontend ada di
+  `context/ROUTES.md` (single source of truth). Jangan mengubah route tanpa
+  memperbarui file itu.
 
 ## 2. Lapisan arsitektur
 
@@ -103,7 +106,7 @@ Indonesia.
 |---|---|---|
 | `Disease` | Daftar/pencarian penyakit (`/diseases/by-body-part/:id`, `/body-systems/:id/diseases`, `/search`) | `id`, `nama`, `ringkasan?: string \| null`, `tingkat_urgensi?` |
 | `DiseaseDetail` | Detail satu penyakit (`/diseases/:id`) | `id`, `id_sistem_tubuh`, `nama`, `slug`, `ringkasan?: string \| null`, `tingkat_urgensi?`, `sistem_tubuh: BodySystem \| null`, `konten: DiseaseContent[]`, `bagian_tubuh: BodyPartRecord[]`, `referensi: Reference[]` |
-| `DiseaseContent` | Blok konten edukasi (`konten_penyakit`) di dalam detail | `id`, `judul`, `slug`, `isi`, `urutan` |
+| `DiseaseContent` | Blok konten edukasi (`konten_penyakit`) di dalam detail | `id`, `judul`, `slug`, `isi`, `urutan`, `gambar_konten?: { id, url_gambar, caption?, urutan }[]` |
 | `Reference` | Referensi/sumber (`referensi`) di dalam detail | `id`, `judul`, `sumber?`, `url?`, `tahun?` |
 | `BodySystem` | Daftar sistem tubuh (`/body-systems`) | `id`, `nama`, `slug`, `deskripsi?` |
 | `BodyPartRecord` | Daftar bagian tubuh (`/body-parts/filter`) | `id`, `nama`, `slug`, `tampilan` (`'depan'\|'belakang'`) |
