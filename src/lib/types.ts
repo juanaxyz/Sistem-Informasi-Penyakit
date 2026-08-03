@@ -13,38 +13,6 @@ export type Disease = {
   tingkat_urgensi?: string;
 };
 
-/** Satu blok konten edukasi (`konten_penyakit`) di dalam detail penyakit. */
-export type DiseaseContent = {
-  id: number;
-  judul: string;
-  slug: string;
-  isi: string;
-  urutan: number;
-};
-
-/** Satu referensi/sumber (`referensi`) di dalam detail penyakit. */
-export type Reference = {
-  id: number;
-  judul: string;
-  sumber?: string | null;
-  url?: string | null;
-  tahun?: number | null;
-};
-
-/** Detail lengkap satu penyakit (hasil `GET /api/diseases/:id`). */
-export type DiseaseDetail = {
-  id: number;
-  id_sistem_tubuh: number;
-  nama: string;
-  slug: string;
-  ringkasan?: string | null;
-  tingkat_urgensi?: string;
-  sistem_tubuh: BodySystem | null;
-  konten: DiseaseContent[];
-  bagian_tubuh: BodyPartRecord[];
-  referensi: Reference[];
-};
-
 /** Satu baris dari tabel `sistem_tubuh` (hasil `GET /api/body-systems`). */
 export type BodySystem = {
   id: number;
@@ -59,4 +27,42 @@ export type BodyPartRecord = {
   nama: string;
   slug: string;
   tampilan: 'depan' | 'belakang';
+};
+
+/** Satu referensi/sumber (`referensi`) di dalam detail penyakit. */
+export type Reference = {
+  id: number;
+  judul: string;
+  sumber?: string | null;
+  url?: string | null;
+  tahun?: number | null;
+};
+
+/** Satu blok konten edukasi (`konten_penyakit`) di dalam detail penyakit. */
+export type DiseaseContent = {
+  id: number;
+  judul: string;
+  slug: string;
+  isi: string;
+  urutan: number;
+  gambar_konten?: {
+    id: number;
+    url_gambar: string;
+    caption?: string | null;
+    urutan: number;
+  }[];
+};
+
+/** Detail lengkap satu penyakit (hasil `GET /api/diseases/:id`). */
+export type DiseaseDetail = {
+  id: number;
+  id_sistem_tubuh: number;
+  nama: string;
+  slug: string;
+  ringkasan?: string | null;
+  tingkat_urgensi?: string;
+  sistem_tubuh: BodySystem | null;
+  konten: DiseaseContent[];
+  bagian_tubuh: BodyPartRecord[];
+  referensi: Reference[];
 };

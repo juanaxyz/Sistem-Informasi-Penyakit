@@ -14,19 +14,22 @@ const PART_DEFAULTS = {
   default: "var(--part-default)",
   hovered: "var(--part-hovered)",
   selected: "var(--part-selected)",
+  highlighted: "var(--part-highlighted)",
 } as const;
 
 type BodyPartProps = {
   part: BodyPartData;
   fill: string;
-  onClick: (id: number) => void;
-  onMouseEnter: (id: number) => void;
-  onMouseLeave: () => void;
+  interactive: boolean;
+  onClick?: (id: number) => void;
+  onMouseEnter?: (id: number) => void;
+  onMouseLeave?: () => void;
 };
 
 const BodyPart = ({
   part,
   fill,
+  interactive,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -35,10 +38,15 @@ const BodyPart = ({
     id={`body-part-${part.id}`}
     d={part.d}
     fill={fill}
-    className="cursor-pointer [-webkit-tap-highlight-color:transparent]"
-    onClick={() => onClick(part.id)}
-    onMouseEnter={() => onMouseEnter(part.id)}
-    onMouseLeave={onMouseLeave}
+    className={[
+      interactive ? "cursor-pointer" : "cursor-default",
+      "[-webkit-tap-highlight-color:transparent]",
+    ].join(" ")}
+    onClick={interactive ? () => onClick?.(part.id) : undefined}
+    onMouseEnter={
+      interactive && !IS_TOUCH_DEVICE ? () => onMouseEnter?.(part.id) : undefined
+    }
+    onMouseLeave={interactive && !IS_TOUCH_DEVICE ? onMouseLeave : undefined}
   >
     <title>{part.name}</title>
   </path>
@@ -85,6 +93,8 @@ type BodySideProps = {
   imageSrc: string;
   selectedPartId: number | null;
   hoveredPartId: number | null;
+  highlightedIds: number[];
+  interactive: boolean;
   onClick: (id: number) => void;
   onMouseEnter: (id: number) => void;
   onMouseLeave: () => void;
@@ -95,6 +105,8 @@ const BodySide = ({
   imageSrc,
   selectedPartId,
   hoveredPartId,
+  highlightedIds,
+  interactive,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -102,6 +114,7 @@ const BodySide = ({
   const partColor = (id: number): string => {
     if (selectedPartId === id) return PART_DEFAULTS.selected;
     if (hoveredPartId === id) return PART_DEFAULTS.hovered;
+    if (highlightedIds.includes(id)) return PART_DEFAULTS.highlighted;
     return PART_DEFAULTS.default;
   };
 
@@ -112,6 +125,7 @@ const BodySide = ({
           key={part.id}
           part={part}
           fill={partColor(part.id)}
+          interactive={interactive}
           onClick={onClick}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
@@ -124,9 +138,18 @@ const BodySide = ({
 interface BodyMapProps {
   selectedPartId: number | null;
   onSelectPart: (id: number) => void;
+  /** Bagian yang disorot tanpa "memilih" (multi-highlight, mis. di preview detail). */
+  highlightedIds?: number[];
+  /** false = tampilan pasif tanpa hover/klik dan tanpa legenda interaktif. */
+  interactive?: boolean;
 }
 
-export const BodyMap = ({ selectedPartId, onSelectPart }: BodyMapProps) => {
+export const BodyMap = ({
+  selectedPartId,
+  onSelectPart,
+  highlightedIds = [],
+  interactive = true,
+}: BodyMapProps) => {
   const [hoveredPartId, setHoveredPartId] = useState<number | null>(null);
   const [activeView, setActiveView] = useState<"ant" | "post">("ant");
 
@@ -174,6 +197,8 @@ export const BodyMap = ({ selectedPartId, onSelectPart }: BodyMapProps) => {
             imageSrc="/images/front.png"
             selectedPartId={selectedPartId}
             hoveredPartId={hoveredPartId}
+            highlightedIds={highlightedIds}
+            interactive={interactive}
             onClick={handleClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
@@ -185,6 +210,8 @@ export const BodyMap = ({ selectedPartId, onSelectPart }: BodyMapProps) => {
             imageSrc="/images/back.png"
             selectedPartId={selectedPartId}
             hoveredPartId={hoveredPartId}
+            highlightedIds={highlightedIds}
+            interactive={interactive}
             onClick={handleClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
@@ -192,20 +219,27 @@ export const BodyMap = ({ selectedPartId, onSelectPart }: BodyMapProps) => {
         </TabsContent>
       </Tabs>
 
-      <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground font-mono px-2">
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded" style={{ backgroundColor: PART_DEFAULTS.default }} />
-          <span>Default</span>
+      {interactive ? (
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground font-mono px-2">
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded" style={{ backgroundColor: PART_DEFAULTS.default }} />
+            <span>Default</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded" style={{ backgroundColor: PART_DEFAULTS.hovered }} />
+            <span>Hover</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded" style={{ backgroundColor: PART_DEFAULTS.selected }} />
+            <span>Terpilih</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded" style={{ backgroundColor: PART_DEFAULTS.hovered }} />
-          <span>Hover</span>
+      ) : (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono px-2">
+          <span className="w-3 h-3 rounded" style={{ backgroundColor: PART_DEFAULTS.highlighted }} />
+          <span>Bagian tubuh terkait</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded" style={{ backgroundColor: PART_DEFAULTS.selected }} />
-          <span>Terpilih</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
