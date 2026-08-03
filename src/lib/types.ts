@@ -1,11 +1,11 @@
 /**
- * Tipe data respons API yang dipakai bersama oleh semua hooks.
+ * Tipe data bersama yang dipakai oleh semua hooks.
  *
  * Nama field mengikuti kolom tabel di `context/DATABASE.md` dan SELECT yang
- * benar-benar dikirim server (`server/src/routes/*.ts`) — jangan diterjemahkan.
+ * benar-benar dikirim ke Supabase (`src/hooks/*.ts`) — jangan diterjemahkan.
  */
 
-/** Satu baris hasil daftar/pencarian penyakit (endpoint `/diseases`, `/search`). */
+/** Satu baris hasil daftar/pencarian penyakit (tabel `penyakit`). */
 export type Disease = {
   id: number;
   nama: string;
@@ -13,7 +13,7 @@ export type Disease = {
   tingkat_urgensi?: string;
 };
 
-/** Satu baris dari tabel `sistem_tubuh` (hasil `GET /api/body-systems`). */
+/** Satu baris dari tabel `sistem_tubuh`. */
 export type BodySystem = {
   id: number;
   nama: string;
@@ -21,7 +21,7 @@ export type BodySystem = {
   deskripsi?: string | null;
 };
 
-/** Satu baris dari tabel `bagian_tubuh` (hasil `GET /api/body-parts/filter`). */
+/** Satu baris dari tabel `bagian_tubuh`. */
 export type BodyPartRecord = {
   id: number;
   nama: string;
@@ -53,7 +53,7 @@ export type DiseaseContent = {
   }[];
 };
 
-/** Detail lengkap satu penyakit (hasil `GET /api/diseases/:id`). */
+/** Detail lengkap satu penyakit (hasil `useDiseaseDetail`). */
 export type DiseaseDetail = {
   id: number;
   id_sistem_tubuh: number;

@@ -1,27 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, isAbortError } from '../lib/api';
+import { isAbortError } from '../lib/supabase';
 
-type UseFetchOptions = {
-  /** Mulai dengan `loading = true` sebelum fetch pertama (mis. list awal). */
+type UseSupabaseQueryOptions = {
+  /** Mulai dengan `loading = true` sebelum query pertama (mis. list awal). */
   initialLoading?: boolean;
-  /** Tunda fetch setiap kali `path` berubah; dipakai untuk debounce pencarian. */
+  /** Tunda query setiap kali `deps` berubah; dipakai untuk debounce pencarian. */
   delayMs?: number;
-  /** Saat `path` menjadi `null`, kembalikan state ke nilai awal. */
+  /** Saat `fetcher` menjadi `null`, kembalikan state ke nilai awal. */
   resetOnNull?: boolean;
-  /** Saat fetch gagal, kosongkan `data` (kembali ke nilai awal). */
+  /** Saat query gagal, kosongkan `data` (kembali ke nilai awal). */
   clearDataOnError?: boolean;
 };
 
 /**
- * Hook fetch generik yang dipakai semua hooks data:
- * - memanggil `api()` (lewat `API_BASE`) saat `path` berubah,
- * - membatalkan request yang tidak lagi relevan lewat `AbortController`,
- * - `path === null` menonaktifkan request (berguna untuk "tunggu id terisi").
+ * Hook query generik ke Supabase (PostgREST).
+ *
+ * - `fetcher` menerima `AbortSignal` dan mengembalikan hasil query; `null`
+ *   menonaktifkan query (berguna untuk "tunggu id terisi").
+ * - `deps` adalah array yang menjadi trigger re-query (mirip `path` di `useFetch` lama).
+ * - Perilaku (abort, debounce, reset) identik dengan `useFetch` lama,
+ *   sehingga kontrak `{ data, loading, error }` komponen tetap stabil.
  */
-export const useFetch = <T>(
-  path: string | null,
+export const useSupabaseQuery = <T>(
+  fetcher: ((signal: AbortSignal) => Promise<T>) | null,
   initialData: T,
-  { initialLoading = false, delayMs = 0, resetOnNull = false, clearDataOnError = false }: UseFetchOptions = {},
+  deps: readonly unknown[],
+  { initialLoading = false, delayMs = 0, resetOnNull = false, clearDataOnError = false }: UseSupabaseQueryOptions = {},
 ): { data: T; loading: boolean; error: string | null } => {
   const [data, setData] = useState<T>(initialData);
   const [loading, setLoading] = useState(initialLoading);
@@ -30,15 +34,18 @@ export const useFetch = <T>(
   // `initialData` hanya dipakai sebagai nilai awal; disimpan di ref agar
   // nilai awal tetap stabil walau caller membuat array/objek baru tiap render.
   const initialDataRef = useRef(initialData);
+  const fetcherRef = useRef(fetcher);
 
   useEffect(() => {
+    fetcherRef.current = fetcher;
+
     const resetToInitial = () => {
       setData(initialDataRef.current);
       setLoading(initialLoading);
       setError(null);
     };
 
-    if (path === null) {
+    if (fetcherRef.current === null) {
       if (resetOnNull) resetToInitial();
       return;
     }
@@ -50,8 +57,8 @@ export const useFetch = <T>(
     const load = async () => {
       setLoading(true);
       try {
-        const json = await api<T>(path, { signal: controller.signal });
-        if (!cancelled) setData(json);
+        const json = await fetcherRef.current?.(controller.signal);
+        if (!cancelled) setData(json as T);
       } catch (e) {
         if (!cancelled && !isAbortError(e)) {
           if (clearDataOnError) setData(initialDataRef.current);
@@ -73,7 +80,8 @@ export const useFetch = <T>(
       if (timer !== undefined) window.clearTimeout(timer);
       controller.abort();
     };
-  }, [path, initialLoading, delayMs, resetOnNull, clearDataOnError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLoading, delayMs, resetOnNull, clearDataOnError, ...deps]);
 
   return { data, loading, error };
 };

@@ -7,8 +7,8 @@ penyakit lewat **tiga jalur**:
 2. **Sistem tubuh** — pilih kategori fungsional (mis. "sistem pencernaan"),
 3. **Pencarian teks** — ketik nama penyakit/gejala.
 
-Ketiganya mengarah ke halaman detail penyakit yang sama (masuk roadmap, lihat
-bagian [Roadmap](#roadmap)).
+Ketiganya mengarah ke halaman detail penyakit yang sama (konten edukasi,
+gambar, bagian tubuh terdampak, dan referensi medis).
 
 > Bukan alat diagnosis/prediksi AI dan bukan pengganti konsultasi dokter.
 > Konten medis divalidasi dari sumber resmi (WHO, Kemenkes RI, CDC) dan
@@ -19,17 +19,18 @@ bagian [Roadmap](#roadmap)).
 | Fase | Status |
 |---|---|
 | FASE 0 — Project Init & Body Map Statis | ✅ Selesai |
-| FASE 1 — Backend & Database (Express + PostgreSQL lokal) | ✅ Selesai |
+| FASE 1 — Database (skema Indonesia) | ✅ Selesai |
 | FASE 2 — Data Layer (Hooks) | ✅ Selesai |
 | FASE 3 — Integrasi Body Map ke Database | ✅ Selesai |
-| FASE 4 — Pencarian & Sistem Tubuh | ⏭️ Berikutnya |
-| FASE 5–6 | 📋 Di `context/TASKS.md` |
+| FASE 4 — Pencarian & Sistem Tubuh | ✅ Selesai |
+| FASE 5 — Halaman Detail & Routing | ✅ Selesai |
+| FASE 6 — Polish | ✅ Selesai |
 
-Backend memakai **Express + PostgreSQL lokal** (keputusan final, 01 Aug 2026);
-rencana Supabase dibatalkan. Saat ini `App.tsx` merender `BodyMap` yang **sudah
-terhubung ke API**: klik bagian tubuh → daftar penyakit (nama, ringkasan, badge
-urgensi) dengan state loading/error/empty. Data dummy 19 penyakit dari hasil
-migrasi `004_redesign_indonesia.sql` dipertahankan untuk pengembangan.
+Arsitektur data: **frontend query Supabase langsung** (PostgREST, RLS
+public-read) via `@supabase/supabase-js`; backend Express + PostgreSQL lokal
+**dihapus** (03 Aug 2026). Deploy: **Vercel** (statis). Data di Supabase:
+4 sistem tubuh, 73 bagian tubuh, 48 penyakit, 137 blok konten, 62 gambar,
+108 relasi penyakit–bagian tubuh, 37 referensi.
 
 ## Tech stack
 
@@ -37,54 +38,42 @@ migrasi `004_redesign_indonesia.sql` dipertahankan untuk pengembangan.
 |---|---|
 | Frontend | React 19 + TypeScript, dibangun dengan Vite 8 |
 | Styling | Tailwind CSS v4 (`@tailwindcss/vite`) + CSS Modules |
-| Backend | Express 5 + TypeScript (`server/`), dijalankan via `tsx` |
-| Database | PostgreSQL (diakses via `pg` connection pool) |
+| Data | Supabase (PostgreSQL via PostgREST), RLS public-read |
 | State | React built-in (`useState`/`useEffect`) — tanpa Redux/Zustand |
-| Routing | `react-router-dom` (dijadwalkan FASE 5) |
+| Routing | `react-router-dom` |
+| Hosting | Vercel (static, `dist/`) |
 
 ## Prasyarat
 
 - **Node.js 20.19+ atau 22.12+** (syarat Vite 8; proyek dikembangkan di Node 24)
 - **npm** (disertakan Node.js)
-- **PostgreSQL 14+** — hanya dibutuhkan untuk menjalankan backend
+- Akses ke project Supabase (URL + anon key)
 
 ## Setup & menjalankan
 
-### 1. Frontend (Vite dev server)
-
 ```bash
 npm install
+cp .env.example .env   # lalu isi VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
 npm run dev
 ```
 
-Dev server berjalan di `http://localhost:5173`.
+Dev server berjalan di `http://localhost:5173`. Data langsung dari Supabase —
+tidak perlu database/backend lokal.
 
-### 2. Backend (Express API — port 4000)
+### Env
 
-```bash
-cd server
-npm install
-cp .env.example .env    # lalu isi DATABASE_URL
-npm run db:setup        # opsional: buat schema + data dummy di PostgreSQL
-npm run dev
+`.env` (lihat `.env.example`):
+
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 ```
 
-API berjalan di `http://localhost:4000`. Server dan frontend adalah **dua
-proses terpisah**. Detail setup database ada di `server/README.md`.
-
-### 3. Menghubungkan frontend ke API
-
-Default `API_BASE` di frontend adalah `/api` (same-origin). Vite dev server
-sudah dikonfigurasi **proxy** `/api` → `http://localhost:4000`
-(lihat `vite.config.ts`), jadi di development tidak perlu file `.env`.
-
-Alternatif (jika tidak memakai proxy): set `VITE_API_URL=http://localhost:4000`
-di file `.env` root — frontend akan memanggil `http://localhost:4000/api/...`
-(`VITE_API_URL` + `/api`). CORS sudah diaktifkan di server.
+`VITE_SUPABASE_ANON_KEY` adalah anon/publishable key — aman di browser karena
+RLS membatasi akses (public SELECT). **Jangan** memakai service_role key di
+kode client.
 
 ## Scripts yang tersedia
-
-Root (frontend):
 
 | Perintah | Fungsi |
 |---|---|
@@ -93,43 +82,18 @@ Root (frontend):
 | `npm run preview` | Preview hasil build produksi |
 | `npm run lint` | ESLint untuk `.ts`/`.tsx` |
 
-`server/` (backend):
-
-| Perintah | Fungsi |
-|---|---|
-| `npm run dev` | Jalankan API dengan auto-restart (`tsx watch`) di port 4000 |
-| `npm start` | Jalankan API tanpa auto-restart |
-| `npm run typecheck` | Cek tipe TypeScript (`tsc --noEmit`) |
-| `npm run db:setup` | Terapkan migrasi + seed data dummy |
-| `npm test` | Test kontrak API (`vitest`; butuh database lokal aktif) |
-
-> Catatan: server punya test kontrak API — `cd server && npm test` (membutuhkan
-> database aktif; memakai `supertest` langsung terhadap `createApp()`).
-
 ## Struktur folder
 
 ```
 web_paru_paru_final/
 ├── AGENTS.md                     # panduan untuk AI agent / kolaborator
-├── context/                      # dokumen produk & teknis (PRD, PROJECT, DATABASE, DESIGN, TASKS, frontend-architecture)
-│   └── frontend-architecture.md  # arsitektur frontend pasca-refactor (wajib dibaca kontributor)
+├── context/                      # dokumen produk & teknis (PRD, PROJECT, DATABASE, DESIGN, TASKS, frontend-architecture, ROUTES)
 ├── logs/                         # catatan sesi kerja (satu file per sesi)
 ├── public/
-│   └── images/
-│       ├── front.png             # overlay realistis body map sisi depan
-│       └── back.png              # overlay realistis body map sisi belakang
-├── server/                       # backend Express + PostgreSQL (port 4000)
-│   ├── src/
-│   │   ├── index.ts              # entry server (env, listen, graceful shutdown)
-│   │   ├── app.ts                # factory aplikasi Express (semua router di bawah /api)
-│   │   ├── config/               # env.ts (validasi env), database.ts (pg.Pool), dbClient.ts (query())
-│   │   ├── middleware/           # errorHandler, notFound, requestLogger
-│   │   ├── routes/               # health, bodyParts, bodySystems, diseases, search (kebab-case)
-│   │   ├── repositories/         # query SQL terpisah dari handler (bodyPartsRepo, diseasesRepo, dsb.)
-│   │   └── utils/                # asyncHandler, httpError, params (validasi ID)
-│   ├── migrations/               # SQL migrasi (schema + seed dummy)
-│   ├── scripts/db-setup.mjs      # runner migrasi
-│   └── .env.example
+│   ├── images/
+│   │   ├── front.png             # overlay realistis body map sisi depan
+│   │   └── back.png              # overlay realistis body map sisi belakang
+│   └── uploads/penyakit/         # gambar konten edukasi (dipakai gambar_konten.url_gambar)
 ├── src/
 │   ├── assets/
 │   │   └── body-parts.ts         # data statis body map (path SVG) — ⚠️ JANGAN DIUBAH
@@ -137,13 +101,14 @@ web_paru_paru_final/
 │   │   └── bodyMap/
 │   │       ├── BodyMap.tsx       # komponen body map dua sisi (depan/belakang)
 │   │       └── BodyMap.module.css
-│   ├── hooks/                    # 6 hooks data + useFetch generik
+│   ├── hooks/                    # useSupabaseQuery (generik) + 6 hooks domain
 │   ├── lib/
-│   │   ├── api.ts                # API_BASE, api(), isAbortError()
-│   │   └── types.ts              # tipe respons API bersama
-│   ├── App.tsx                   # saat ini hanya merender <BodyMap />
+│   │   ├── supabase.ts           # client Supabase (anon key) + isAbortError()
+│   │   └── types.ts              # tipe data bersama (Disease, DiseaseDetail, …)
+│   ├── App.tsx                   # router (HomePage, DiseaseDetailPage, fallback)
 │   ├── main.tsx
 │   └── index.css
+├── .env.example
 ├── index.html
 ├── package.json
 └── vite.config.ts                # plugin react + tailwindcss
@@ -151,85 +116,47 @@ web_paru_paru_final/
 
 ## Cara kerja (alur data)
 
-**Kondisi sekarang (FASE 3, body map terhubung ke API):**
-
 ```
-BodyMap.tsx ──import──> src/assets/body-parts.ts   (array { face, name, id, d } — geometri SVG, jangan diubah)
-      │
-      ├─ BodyPart  : render <path d={part.d}> + tooltip nama
-      ├─ BodySide  : satu kolom (Depan / Belakang)
-      ├─ BodyContainer : overlay front.png / back.png + <svg viewBox>
-      │
-      └─ klik bagian tubuh ──> useDiseasesByBodyPart(id) ──> daftar penyakit (nama, ringkasan, tingkat_urgensi)
-```
-
-**Lapisan data (dipakai komponen, termasuk BodyMap):**
-
-```
-Komponen UI
-    │  memakai hooks data
+Komponen UI (BodyMap, list, search, detail)
+    │  memakai hooks domain
     ▼
 src/hooks/  (useBodyParts, useBodySystems, useDiseasesByBodyPart,
              useDiseasesByBodySystem, useDiseaseDetail, useSearchDiseases)
-    │  semuanya dibangun di atas useFetch
+    │  semuanya dibangun di atas useSupabaseQuery
     ▼
-src/hooks/useFetch.ts  (fetch on path-change, abort request basi, debounce)
+src/hooks/useSupabaseQuery.ts  (re-query on deps-change, abort request basi, debounce)
     │
     ▼
-src/lib/api.ts  (api<T>() → fetch(`${API_BASE}${path}`), isAbortError)
+src/lib/supabase.ts  (client anon) → Supabase PostgREST (RLS public-read)
     │
     ▼
-Express API (server/) — semua router di mount di bawah /api (server/src/app.ts)
-    │  query() terparameterisasi via pg.Pool
-    ▼
-PostgreSQL
+PostgreSQL (sistem_tubuh, bagian_tubuh, penyakit, konten_penyakit,
+           gambar_konten, penyakit_bagian_tubuh, referensi)
 ```
 
 Kontrak tiap hook stabil: **`{ data, loading, error }`** (khusus pencarian
 ditambah `activeQuery`). Detail lengkap: `context/frontend-architecture.md`.
 
-Endpoint yang tersedia (semua `GET`, MVP read-only) — **kontrak lengkap dan
-final ada di `context/ROUTES.md`** (single source of truth; jangan mengubah
-route tanpa memperbarui file tersebut):
-
-| Endpoint | Fungsi |
-|---|---|
-| `/api/health` | Status API + koneksi database (200 `{ status: 'ok', database: 'up' }`; 503 bila DB down) |
-| `/api/body-parts` | Semua bagian tubuh |
-| `/api/body-parts/filter?tampilan=depan\|belakang` | Bagian tubuh (filter opsional) |
-| `/api/body-systems` | Sistem tubuh |
-| `/api/body-systems/:id/diseases` | Penyakit pada satu sistem tubuh |
-| `/api/diseases/by-body-part/:id` | Penyakit terkait satu bagian tubuh |
-| `/api/diseases/:id` | Detail penyakit (`null` bila tidak ada; termasuk `sistem_tubuh`, `konten[]` + `gambar_konten[]`, `bagian_tubuh[]`, `referensi[]`) |
-| `/api/search?q=` | Pencarian nama/ringkasan penyakit |
-| `/api/uploads/penyakit/:file` | File gambar konten edukasi (dipakai `gambar_konten.url_gambar`) |
-
-Respons error konsisten `{ error: { message } }` (mis. 404 untuk endpoint
-tidak dikenal). Nama endpoint memakai kebab-case canonical — alias legacy
-(`/api/bodyParts`, `/api/bodySystems`, `/api/diseases` tanpa prefix, `/api/v1/*`)
-**tidak tersedia** (404) dan tidak akan dihidupkan kembali.
+Akses data per hook dan detail query — **kontrak lengkap ada di
+`context/ROUTES.md`** (single source of truth; jangan mengubah query tabel
+tanpa memperbarui file tersebut).
 
 ## Roadmap
 
-Lihat `context/TASKS.md` untuk detail acceptance criteria tiap fase:
-
-- **FASE 1** — Backend & Database (Express + PostgreSQL lokal) ✅
-- **FASE 2** — Data layer hooks ✅
-- **FASE 3** — Integrasi body map ke database (klik → daftar penyakit) ✅
-- **FASE 4** — Fitur pencarian & sistem tubuh
-- **FASE 5** — Halaman detail + routing (`react-router-dom`)
-- **FASE 6** — Polish (empty/loading/error state, responsive, README)
+Semua fase fitur selesai. Tersisa:
+- Finalisasi `README.md` (dokumen ini).
+- Penggantian data dummy dengan data medis final yang dikonfirmasi pemilik
+  project (WHO/Kemenkes RI/CDC).
 
 ## Dokumen referensi
 
 | Dokumen | Isi |
 |---|---|
-| `context/frontend-architecture.md` | Arsitektur frontend pasca-refactor |
-| `context/ROUTES.md` | Kontrak route API & frontend (single source of truth) |
-| `server/README.md` | Dokumentasi backend (setup, migrasi, endpoint) |
+| `context/frontend-architecture.md` | Arsitektur frontend (hooks, alur data) |
+| `context/ROUTES.md` | Kontrak route frontend & pemetaan akses data Supabase |
 | `context/PRD.md` | Kebutuhan produk |
 | `context/PROJECT.md` | Stack & struktur folder |
-| `context/DATABASE.md` | Skema PostgreSQL (referensi) |
+| `context/DATABASE.md` | Skema Supabase/PostgreSQL (referensi) |
 | `context/DESIGN.md` | Spesifikasi body map |
 | `context/TASKS.md` | Rencana fase implementasi |
 
@@ -238,4 +165,4 @@ Lihat `context/TASKS.md` untuk detail acceptance criteria tiap fase:
 - UI berbahasa **Indonesia**, sederhana, hindari jargon medis berat.
 - **Jangan ubah data `d` (path SVG) di `src/assets/body-parts.ts`** — itu geometri area tubuh.
 - Tanpa fitur diagnosis/prediksi AI; tanpa operasi tulis dari client (MVP read-only).
-- Tanpa secret/kunci Supabase di kode client.
+- Tanpa secret/kunci Supabase (service_role) di kode client.

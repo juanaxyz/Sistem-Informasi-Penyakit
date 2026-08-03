@@ -1,17 +1,28 @@
-import { useFetch } from './useFetch';
+import { useCallback } from 'react';
+import { useSupabaseQuery } from './useSupabaseQuery';
+import { supabase } from '../lib/supabase';
 import type { BodyPartRecord } from '../lib/types';
 
 /**
- * Mengambil daftar bagian tubuh dari `GET /api/body-parts/filter`.
- * `tampilan` opsional, nilainya mengikuti tabel `bagian_tubuh`
- * (mis. `tampilan="depan"`).
+ * Mengambil daftar bagian tubuh dari tabel `bagian_tubuh` (Supabase).
+ * `tampilan` opsional, nilainya mengikuti tabel (`'depan'` / `'belakang'`).
  */
 export const useBodyParts = (tampilan?: 'depan' | 'belakang') => {
-  const query = new URLSearchParams();
-  if (tampilan) query.set('tampilan', tampilan);
+  const fetcher = useCallback(
+    async (signal: AbortSignal): Promise<BodyPartRecord[]> => {
+      let query = supabase
+        .from('bagian_tubuh')
+        .select('id,nama,slug,tampilan')
+        .order('id', { ascending: true })
+        .abortSignal(signal);
+      if (tampilan) query = query.eq('tampilan', tampilan);
 
-  const queryString = query.toString();
-  const path = queryString ? `/body-parts/filter?${queryString}` : '/body-parts/filter';
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      return (data as BodyPartRecord[]) ?? [];
+    },
+    [tampilan]
+  );
 
-  return useFetch<BodyPartRecord[]>(path, [], { initialLoading: true });
+  return useSupabaseQuery(fetcher, [], [tampilan], { initialLoading: true });
 };

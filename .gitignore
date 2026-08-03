@@ -15,8 +15,6 @@ dist-ssr
 # Environment secrets
 .env
 .env.local
-server/.env
-server/.env.local
 
 # Editor directories and files
 .vscode/*
