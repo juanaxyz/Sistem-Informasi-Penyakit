@@ -1,0 +1,23 @@
+{
+  "name": "web-paru-paru-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BFF (backend-for-frontend) untuk web_paru_paru — Express + Supabase. Menyajikan route /api untuk data penyakit, bagian tubuh, sistem tubuh, dan pencarian.",
+  "scripts": {
+    "dev": "nodemon --exec tsx src/server.js",
+    "start": "tsx src/server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^24.0.0",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.19.2"
+  }
+}
