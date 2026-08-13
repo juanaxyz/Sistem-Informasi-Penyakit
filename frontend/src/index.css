@@ -1,8 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
   /* Radius tokens */
   --radius-sm: calc(var(--radius) * 0.6);
@@ -73,28 +71,6 @@
   --ring: oklch(0.32 0.08 165);             /* pine */
 }
 
-.dark {
-  --background: oklch(0.15 0.01 160);
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.18 0.01 160);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.18 0.01 160);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.65 0.08 165);
-  --primary-foreground: oklch(0.15 0.01 160);
-  --secondary: oklch(0.22 0.02 160);
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.22 0.02 160);
-  --muted-foreground: oklch(0.65 0.02 160);
-  --accent: oklch(0.22 0.02 160);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.65 0.22 27);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.65 0.08 165);
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -125,10 +101,35 @@
 :root {
   --body-map-viewbox: 0 0 375.42 832.97;
   --part-default: rgba(214, 229, 220, 0.85);
-  --part-hovered: rgba(150, 200, 180, 0.9);
+  --part-hovered: rgba(14, 94, 80, 0.45);
   --part-selected: rgba(14, 94, 80, 1);
   --part-highlighted: rgba(14, 94, 80, 0.55);
   --urgency-normal: oklch(0.65 0.15 150);
   --urgency-waspada: oklch(0.75 0.18 85);
   --urgency-darurat: oklch(0.58 0.24 27);
+}
+
+/* Body part interaksi: transisi halus + fokus keyboard yang terlihat */
+.body-part {
+  transition: fill 150ms ease;
+}
+
+.body-part:focus-visible {
+  outline: none;
+  stroke: var(--part-selected);
+  stroke-width: 2.5;
+}
+
+/* Badge urgensi — warna mengikuti token palet (bukan emerald/amber/red default) */
+.badge-success {
+  background-color: color-mix(in oklab, var(--urgency-normal) 15%, white);
+  color: color-mix(in oklab, var(--urgency-normal) 45%, black);
+}
+.badge-warning {
+  background-color: color-mix(in oklab, var(--urgency-waspada) 18%, white);
+  color: color-mix(in oklab, var(--urgency-waspada) 55%, black);
+}
+.badge-danger {
+  background-color: color-mix(in oklab, var(--urgency-darurat) 18%, white);
+  color: color-mix(in oklab, var(--urgency-darurat) 70%, black);
 }

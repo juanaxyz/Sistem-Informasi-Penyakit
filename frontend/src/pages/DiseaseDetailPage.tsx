@@ -106,10 +106,10 @@ export function DiseaseDetailPage() {
 
   useEffect(() => {
     document.title = data
-      ? `${data.nama} — Sistem Informasi Penyakit`
-      : "Sistem Informasi Penyakit";
+      ? `${data.nama} — Peta Kesehatan`
+      : "Peta Kesehatan";
     return () => {
-      document.title = "Sistem Informasi Penyakit";
+      document.title = "Peta Kesehatan";
     };
   }, [data]);
 

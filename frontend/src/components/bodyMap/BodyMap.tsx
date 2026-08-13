@@ -1,4 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import {
   bodyParts,
   type BodyPart as BodyPartData,
@@ -23,6 +28,7 @@ type BodyPartProps = {
   part: BodyPartData;
   fill: string;
   interactive: boolean;
+  selected?: boolean;
   onClick?: (id: number) => void;
   onMouseEnter?: (id: number) => void;
   onMouseLeave?: () => void;
@@ -32,46 +38,45 @@ const BodyPart = ({
   part,
   fill,
   interactive,
+  selected,
   onClick,
   onMouseEnter,
   onMouseLeave,
-}: BodyPartProps) => (
-  <path
-    id={`body-part-${part.id}`}
-    d={part.d}
-    fill={fill}
-    className={[
-      interactive ? "cursor-pointer" : "cursor-default",
-      "[-webkit-tap-highlight-color:transparent]",
-    ].join(" ")}
-    onClick={interactive ? () => onClick?.(part.id) : undefined}
-    onMouseEnter={
-      interactive && !IS_TOUCH_DEVICE
-        ? () => onMouseEnter?.(part.id)
-        : undefined
+}: BodyPartProps) => {
+  const handleKeyDown = (e: KeyboardEvent<SVGPathElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick?.(part.id);
     }
-    onMouseLeave={interactive && !IS_TOUCH_DEVICE ? onMouseLeave : undefined}
-  >
-    <title>{part.name}</title>
-  </path>
-);
+  };
 
-const CROSSHAIR_SIZE = 14;
-
-const CrosshairMarks = () => (
-  <g stroke="var(--border)" strokeWidth="1.5" fill="none">
-    <path d={`M 0 ${CROSSHAIR_SIZE} V 0 H ${CROSSHAIR_SIZE}`} />
+  return (
     <path
-      d={`M ${375.42 - CROSSHAIR_SIZE} 0 H ${375.42} V ${CROSSHAIR_SIZE}`}
-    />
-    <path
-      d={`M ${375.42} ${832.97 - CROSSHAIR_SIZE} V ${832.97} H ${375.42 - CROSSHAIR_SIZE}`}
-    />
-    <path
-      d={`M 0 ${832.97 - CROSSHAIR_SIZE} V ${832.97} H ${CROSSHAIR_SIZE}`}
-    />
-  </g>
-);
+      id={`body-part-${part.id}`}
+      d={part.d}
+      fill={fill}
+      tabIndex={interactive ? 0 : undefined}
+      role={interactive ? "button" : undefined}
+      aria-label={interactive ? part.name : undefined}
+      aria-pressed={interactive && selected ? true : undefined}
+      className={[
+        "body-part",
+        interactive ? "cursor-pointer" : "cursor-default",
+        "[-webkit-tap-highlight-color:transparent]",
+      ].join(" ")}
+      onClick={interactive ? () => onClick?.(part.id) : undefined}
+      onKeyDown={interactive ? handleKeyDown : undefined}
+      onMouseEnter={
+        interactive && !IS_TOUCH_DEVICE
+          ? () => onMouseEnter?.(part.id)
+          : undefined
+      }
+      onMouseLeave={interactive && !IS_TOUCH_DEVICE ? onMouseLeave : undefined}
+    >
+      <title>{part.name}</title>
+    </path>
+  );
+};
 
 type BodyContainerProps = {
   children: ReactNode;
@@ -93,7 +98,6 @@ const BodyContainer = ({ children, imageSrc }: BodyContainerProps) => (
       className="relative w-full h-full block"
     >
       <g>{children}</g>
-      <CrosshairMarks />
     </svg>
   </div>
 );
@@ -136,6 +140,7 @@ const BodySide = ({
           part={part}
           fill={partColor(part.id)}
           interactive={interactive}
+          selected={selectedPartId === part.id}
           onClick={onClick}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}

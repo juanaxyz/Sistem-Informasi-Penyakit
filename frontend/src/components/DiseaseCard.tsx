@@ -20,7 +20,9 @@ export function DiseaseCard({ disease }: DiseaseCardProps) {
             <h3 className="font-medium text-base text-ink flex-1 min-w-0">
               {disease.nama}
             </h3>
-            <UrgencyBadge disease={disease} />
+            {disease.tingkat_urgensi !== "normal" && (
+              <UrgencyBadge disease={disease} />
+            )}
           </div>
           {disease.ringkasan && (
             <p className="mt-2 text-sm text-muted-foreground line-clamp-2">

@@ -1,9 +1,9 @@
-# Web Paru Paru — Sistem Informasi Penyakit (Body Map Interaktif)
+# Peta Kesehatan — Web Informasi Penyakit (Body Map Interaktif)
 
 Web informasi penyakit untuk masyarakat umum. Pengguna mencari informasi
 penyakit lewat **body map interaktif** (klik area tubuh, lalu pilih sistem
 tubuh terlebih dahulu untuk melihat daftar penyakitnya — wajib) atau
-**pencarian teks**. Keduanya mengarah ke halaman detail penyakit yang sama
+**pencarian teks di navbar**. Keduanya mengarah ke halaman detail penyakit yang sama
 (konten edukasi, gambar, bagian tubuh terdampak, referensi medis).
 
 > Bukan alat diagnosis/prediksi AI dan bukan pengganti konsultasi dokter.
@@ -26,7 +26,7 @@ final yang dikonfirmasi pemilik project (WHO/Kemenkes RI/CDC).
 Alur data:
 
 ```
-Komponen UI (BodyMap, ResultsPanel, SearchTab, DiseaseDetailPage)
+Komponen UI (BodyMap, ResultsPanel, HeaderSearch, DiseaseDetailPage)
     ▼
 src/hooks/*  (react-query: useBodyParts, useSystemsByBodyPart,
               useDiseasesByBodyPartAndSystem, useSearchDiseases,
@@ -93,7 +93,7 @@ web_paru_paru_final/
 ├── frontend/
 │   ├── src/
 │   │   ├── assets/body-parts.ts     # data statis body map (path SVG) — ⚠️ JANGAN DIUBAH
-│   │   ├── components/              # UI + bodyMap/ (BodyMap.tsx, BodyMap.module.css)
+│   │   ├── components/              # UI + bodyMap/ (BodyMap.tsx) + HeaderSearch (cari di navbar)
 │   │   ├── hooks/                   # react-query hooks (data via api.ts)
 │   │   ├── lib/                     # api.ts (client BFF), types.ts, utils.ts (cn)
 │   │   ├── pages/                   # HomePage, DiseaseDetailPage
