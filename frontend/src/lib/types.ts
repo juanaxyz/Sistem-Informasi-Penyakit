@@ -14,6 +14,8 @@ export interface SystemRecord {
   nama: string;
   slug: string;
   deskripsi: string | null;
+  /** Jumlah penyakit yang terkait di bagian tubuh ybs (dari byBody). */
+  jumlah_penyakit?: number;
 }
 
 /** Ringkasan satu penyakit (hasil list/search). */

@@ -100,7 +100,7 @@
 /* Body map specific tokens (kept for component use) */
 :root {
   --body-map-viewbox: 0 0 375.42 832.97;
-  --part-default: rgba(214, 229, 220, 0.85);
+  --part-default: rgba(214, 229, 220, 0.92);
   --part-hovered: rgba(14, 94, 80, 0.45);
   --part-selected: rgba(14, 94, 80, 1);
   --part-highlighted: rgba(14, 94, 80, 0.55);
@@ -109,9 +109,22 @@
   --urgency-darurat: oklch(0.58 0.24 27);
 }
 
-/* Body part interaksi: transisi halus + fokus keyboard yang terlihat */
+/* Body part interaksi: transisi halus + fokus keyboard yang terlihat.
+   State visual: redup di default, medium saat hover, pekat + stroke saat
+   terpilih. Transform-box fill-box agar scale berpusat pada area bagian. */
 .body-part {
-  transition: fill 150ms ease;
+  transition: fill 200ms ease, opacity 200ms ease, transform 200ms ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.body-part.body-part-hovered {
+  transform: scale(1.02);
+}
+
+.body-part[aria-pressed="true"] {
+  stroke: var(--part-selected);
+  stroke-width: 1.5;
 }
 
 .body-part:focus-visible {

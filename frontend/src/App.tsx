@@ -22,22 +22,19 @@ export default function App() {
     {
       icon: <House size={18} />,
       label: "Home",
-      className:
-        "text-emerald-700  group-hover:text-white bg-white hover:cursor-pointer",
+      active: location.pathname === "/",
       onClick: () => navigate("/"),
     },
     {
       icon: <ScanSearch size={18} />,
       label: "Body Map",
-      className:
-        "text-emerald-700  group-hover:text-white bg-white hover:cursor-pointer",
+      active: location.pathname.startsWith("/body-map"),
       onClick: () => navigate("/body-map"),
     },
     {
       icon: <ScanLine size={18} />,
       label: "Analisis X-Ray",
-      className:
-        "text-emerald-700  group-hover:text-white bg-white hover:cursor-pointer",
+      active: location.pathname.startsWith("/analisis-xray"),
       onClick: () => navigate("/analisis-xray"),
     },
   ];

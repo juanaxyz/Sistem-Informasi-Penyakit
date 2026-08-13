@@ -65,16 +65,20 @@ function SystemCard({
       onClick={onClick}
       className="group flex w-full items-center gap-4 rounded-lg border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-pine/40 hover:bg-mint/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:cursor-pointer"
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-secondary text-pine">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-mint text-pine">
         {systemIcon(system)}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-medium text-ink">{system.nama}</span>
-        {system.deskripsi && (
+        {system.jumlah_penyakit != null ? (
+          <span className="mt-0.5 block font-mono text-xs text-muted-foreground">
+            {system.jumlah_penyakit} penyakit
+          </span>
+        ) : system.deskripsi ? (
           <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
             {system.deskripsi}
           </span>
-        )}
+        ) : null}
       </span>
       <ChevronRight
         className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-pine"

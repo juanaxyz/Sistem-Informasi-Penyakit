@@ -1,14 +1,10 @@
-import {
-  useMemo,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
+import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   bodyParts,
   type BodyPart as BodyPartData,
 } from "../../assets/body-parts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AnimatePresence, motion } from "motion/react";
 
 import frontImages from "/images/front.png";
 import backImages from "/images/back.png";
@@ -29,6 +25,7 @@ type BodyPartProps = {
   fill: string;
   interactive: boolean;
   selected?: boolean;
+  hovered?: boolean;
   onClick?: (id: number) => void;
   onMouseEnter?: (id: number) => void;
   onMouseLeave?: () => void;
@@ -39,6 +36,7 @@ const BodyPart = ({
   fill,
   interactive,
   selected,
+  hovered,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -61,6 +59,7 @@ const BodyPart = ({
       aria-pressed={interactive && selected ? true : undefined}
       className={[
         "body-part",
+        hovered ? "body-part-hovered" : "",
         interactive ? "cursor-pointer" : "cursor-default",
         "[-webkit-tap-highlight-color:transparent]",
       ].join(" ")}
@@ -141,6 +140,7 @@ const BodySide = ({
           fill={partColor(part.id)}
           interactive={interactive}
           selected={selectedPartId === part.id}
+          hovered={hoveredPartId === part.id}
           onClick={onClick}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
@@ -157,6 +157,8 @@ interface BodyMapProps {
   highlightedIds?: number[];
   /** false = tampilan pasif tanpa hover/klik dan tanpa legenda interaktif. */
   interactive?: boolean;
+  /** Teks tambahan saat bagian terpilih, mis. "Dada · 3 sistem". */
+  selectedPartMeta?: string;
 }
 
 export const BodyMap = ({
@@ -164,6 +166,7 @@ export const BodyMap = ({
   onSelectPart,
   highlightedIds = [],
   interactive = true,
+  selectedPartMeta,
 }: BodyMapProps) => {
   const [hoveredPartId, setHoveredPartId] = useState<number | null>(null);
   const [activeView, setActiveView] = useState<"ant" | "post">("ant");
@@ -191,8 +194,44 @@ export const BodyMap = ({
     setHoveredPartId(null);
   };
 
+  const activeLabelPartId = interactive
+    ? (hoveredPartId ?? selectedPartId)
+    : selectedPartId;
+  const activeLabelPart =
+    activeLabelPartId != null
+      ? bodyParts.find((p) => p.id === activeLabelPartId)
+      : undefined;
+
+  const isHover = hoveredPartId != null && hoveredPartId !== selectedPartId;
+  const activeLabel =
+    activeLabelPart == null
+      ? null
+      : isHover
+        ? activeLabelPart.name
+        : selectedPartMeta
+          ? `${activeLabelPart.name}`
+          : activeLabelPart.name;
+
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-3">
+      <div className="h-6 flex items-center justify-center">
+        <AnimatePresence mode="popLayout">
+          {interactive && activeLabel ? (
+            <motion.div
+              key={activeLabel}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+              className="hidden hover:block max-w-[16rem] truncate rounded-full border border-border bg-background px-3 py-0.5 font-mono text-xs text-ink shadow-sm"
+            >
+              <span className="mr-1.5  w-1.5 h-1.5 rounded-full bg-pine align-middle " />
+              {activeLabel}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+
       <Tabs
         value={activeView}
         onValueChange={(value) => setActiveView(value as "ant" | "post")}

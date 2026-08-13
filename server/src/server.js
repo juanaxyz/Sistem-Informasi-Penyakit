@@ -62,14 +62,18 @@ app.get(
       .eq("id_bagian_tubuh", idBody);
     if (error) throw error;
 
-    const sistemTubuh = [
-      ...new Map(
-        data.map((item) => [
-          item.penyakit.sistem_tubuh.id,
-          item.penyakit.sistem_tubuh,
-        ]),
-      ).values(),
-    ];
+    const systemById = new Map();
+    for (const item of data) {
+      const system = item.penyakit.sistem_tubuh;
+      const current = systemById.get(system.id);
+      if (current) {
+        current.jumlah_penyakit += 1;
+      } else {
+        systemById.set(system.id, { ...system, jumlah_penyakit: 1 });
+      }
+    }
+
+    const sistemTubuh = [...systemById.values()];
 
     res.json({ sistem_tubuh: sistemTubuh });
   }),
