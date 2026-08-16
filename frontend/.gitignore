@@ -32,4 +32,3 @@ dist-ssr
 context/*
 AGENTS.md
 .opencode
-opencode.json
