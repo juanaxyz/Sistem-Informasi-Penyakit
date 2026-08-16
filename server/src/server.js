@@ -7,6 +7,8 @@ const { createClient } = require("@supabase/supabase-js");
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+const RAG_API_URL = process.env.RAG_API_URL || "http://localhost:8000";
+
 const db = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY,
@@ -17,6 +19,7 @@ const corsOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
   : true;
 app.use(cors({ origin: corsOrigins }));
+app.use(express.json());
 
 // Bungkus handler: error apa pun (termasuk dari Supabase) → 500 JSON konsisten.
 const handle = (fn) => async (req, res) => {
@@ -229,6 +232,38 @@ app.get(
 app.get("/", (_req, res) => {
   res.json({ ok: true });
 });
+
+// Proxy chat RAG ke RAG API (FastAPI). Frontend tidak perlu tahu endpoint ini.
+app.post(
+  "/api/rag/chat",
+  handle(async (req, res) => {
+    const question = String(req.body?.question ?? "").trim();
+    if (!question) {
+      return res.status(400).json({ error: "question wajib diisi" });
+    }
+
+    const payload = { question };
+    if (typeof req.body?.session_id === "string") {
+      payload.session_id = req.body.session_id;
+    }
+    if (Array.isArray(req.body?.history)) {
+      payload.history = req.body.history;
+    }
+
+    const ragRes = await fetch(`${RAG_API_URL}/api/rag/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await ragRes.json().catch(() => null);
+    if (!ragRes.ok) {
+      throw new Error(data?.detail ?? data?.error ?? "RAG API error");
+    }
+
+    res.json(data);
+  }),
+);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

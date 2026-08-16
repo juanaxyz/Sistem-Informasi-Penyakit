@@ -209,11 +209,11 @@ export function DiseaseDetailPage() {
                 <Badge variant="secondary">{data.sistem_tubuh.nama}</Badge>
               )}
             </div>
-            <h1 className="mt-4 font-display text-3xl md:text-4xl font-medium tracking-tight text-ink">
+            <h1 className="mt-4 font-display text-3xl md:text-4xl font-medium tracking-tight text-ink text-balance">
               {data.nama}
             </h1>
             {data.ringkasan && (
-              <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
+              <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground text-pretty">
                 {data.ringkasan}
               </p>
             )}

@@ -117,16 +117,13 @@ export function ResultsPanel({
   /* STATE 1 — belum memilih bagian tubuh. */
   if (selectedPartId === null || selectedPartName === null) {
     return (
-      <div className="flex flex-col items-start py-6 md:py-10">
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-pine">
+      <div className="results-empty">
+        <span className="results-empty-icon">
           <MousePointerClick className="h-5 w-5" aria-hidden="true" />
         </span>
-        <h2 className="mt-4 font-display text-2xl md:text-3xl font-medium text-ink">
-          Pilih bagian tubuh
-        </h2>
-        <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground md:text-base">
-          Klik area pada peta tubuh untuk melihat sistem tubuh dan penyakit yang
-          berkaitan.
+        <h2 className="results-empty-title">Pilih bagian tubuh</h2>
+        <p className="results-empty-desc">
+          Klik area pada peta tubuh untuk melihat sistem tubuh dan penyakit yang berkaitan.
         </p>
       </div>
     );
@@ -140,13 +137,13 @@ export function ResultsPanel({
           <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
             Bagian tubuh
           </p>
-          <h2 className="mt-1 font-display text-2xl font-medium text-ink md:text-3xl">
+          <h2 className="mt-1 font-display text-2xl font-medium text-ink md:text-3xl text-balance">
             {selectedPartName}
           </h2>
         </header>
 
         <div>
-          <h3 className="font-display text-lg font-semibold text-ink">
+          <h3 className="font-display text-lg font-semibold text-ink text-balance">
             Pilih sistem tubuh
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -199,7 +196,7 @@ export function ResultsPanel({
           </span>
           {selectedSystem?.nama ?? "Sistem"}
         </p>
-        <h2 className="mt-1 font-display text-2xl font-medium text-ink md:text-3xl">
+        <h2 className="mt-1 font-display text-2xl font-medium text-ink md:text-3xl text-balance">
           {selectedSystem?.nama ?? "Penyakit"}
         </h2>
 

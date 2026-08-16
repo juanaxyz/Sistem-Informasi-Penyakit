@@ -27,7 +27,7 @@ export function BodyMapPage() {
   return (
     <div>
       <section className="mb-6 text-center">
-        <h1 className="font-display text-3xl md:text-4xl font-medium text-ink">
+        <h1 className="font-display text-3xl md:text-4xl font-medium text-ink tracking-tight text-balance">
           Tubuh Anda, <span className="text-pine">peta kesehatannya</span>.
         </h1>
         <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mt-1">
