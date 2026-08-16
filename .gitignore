@@ -28,8 +28,19 @@ dist-ssr
 *.sln
 *.sw?
 
+# Python
+__pycache__/
+*.py[cod]
+RAG/.vscode/
+
 # AI
 context/*
 AGENTS.md
 .opencode
+.impeccable
 opencode.json
+frontend/DESIGN.md
+frontend/PRODUCT.md
+
+
+laporan/*

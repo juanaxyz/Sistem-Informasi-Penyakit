@@ -41,9 +41,9 @@
   --color-ink: oklch(0.15 0.01 160);
 
   /* Font tokens */
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-mono: "Fragment Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 :root {
@@ -131,6 +131,45 @@
   outline: none;
   stroke: var(--part-selected);
   stroke-width: 2.5;
+}
+
+/* ResultsPanel state kosong — komposisi tengah, ukuran tenang */
+.results-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2.5rem 0;
+  max-width: 24rem;
+  margin-inline: auto;
+}
+.results-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  background: var(--color-secondary);
+  color: var(--color-primary);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-primary) 12%, transparent);
+}
+.results-empty-title {
+  margin-top: 1.25rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 2.5vw, 1.875rem);
+  font-weight: 500;
+  color: var(--color-ink);
+  text-wrap: balance;
+}
+.results-empty-desc {
+  margin-top: 0.75rem;
+  max-width: 22rem;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.625;
+  color: var(--color-muted-foreground);
+  text-wrap: pretty;
 }
 
 /* Badge urgensi — warna mengikuti token palet (bukan emerald/amber/red default) */

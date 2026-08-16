@@ -64,3 +64,26 @@ export interface DiseaseDetail {
   bagian_tubuh: Pick<BodyPartRecord, "id" | "nama" | "slug">[];
   referensi: Referensi[];
 }
+
+/** Satu turn percakapan yang dikirim ke API RAG. */
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** Satu chunk hasil retrieval RAG (dari knowledge_embeddings). */
+export interface ChatSource {
+  source_type: "disease" | "faq";
+  source_id: number | null;
+  penyakit_id: number | null;
+  content: string;
+  similarity: number;
+}
+
+/** Respons endpoint /api/rag/chat. */
+export interface ChatResult {
+  question: string;
+  answer: string;
+  sources: ChatSource[];
+  session_id?: string | null;
+}

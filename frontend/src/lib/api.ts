@@ -1,12 +1,14 @@
 import type {
   BodyPartRecord,
+  ChatResult,
+  ChatTurn,
   Disease,
   DiseaseDetail,
   SystemRecord,
 } from "./types";
 
 /** Base URL server BFF. Bisa dioverride lewat env `VITE_API_URL`. */
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export class ApiError extends Error {
   status: number;
@@ -29,6 +31,26 @@ async function get<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as
+      | { error?: string; detail?: string }
+      | null;
+    throw new ApiError(
+      body?.error ?? body?.detail ?? `Permintaan gagal (${res.status})`,
+      res.status,
+    );
+  }
+
+  return (await res.json()) as T;
+}
+
 export const api = {
   getBodyParts: () => get<{ bagian_tubuh: BodyPartRecord[] }>("/api/bagian-tubuh"),
   getSystemsByBodyPart: (idBody: number) =>
@@ -39,4 +61,6 @@ export const api = {
     get<{ penyakit: Disease[] }>(`/api/penyakit/cari?q=${encodeURIComponent(q)}`),
   getDiseaseDetail: (id: number) =>
     get<{ penyakit: DiseaseDetail }>(`/api/penyakit/${id}`),
+  chat: (payload: { question: string; session_id?: string; history?: ChatTurn[] }) =>
+    post<ChatResult>("/api/rag/chat", payload),
 };

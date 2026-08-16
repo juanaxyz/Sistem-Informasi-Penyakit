@@ -48,10 +48,10 @@ export default function XRayAnalysisPage() {
         <p className="font-mono text-xs uppercase tracking-widest text-pine">
           Analisis X-Ray
         </p>
-        <h1 className="mt-3 font-display text-3xl md:text-4xl font-medium text-ink">
+        <h1 className="mt-3 font-display text-3xl md:text-4xl font-medium text-ink tracking-tight text-balance">
           Unggah, lihat pratinjau, analisis.
         </h1>
-        <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground leading-relaxed">
+        <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground leading-relaxed text-pretty">
           Demo alur kerja analisis gambar dada. Hasil di halaman ini adalah
           contoh dan tidak boleh dipakai untuk keputusan medis.
         </p>

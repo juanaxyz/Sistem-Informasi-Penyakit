@@ -6,6 +6,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { SiteHeader } from "./components/SiteHeader";
+import { ChatWidget } from "./components/ChatWidget";
 import HomePage from "./pages/HomePage";
 import { BodyMapPage } from "./pages/BodyMapPage";
 import XRayAnalysisPage from "./pages/XRayAnalysisPage";
@@ -72,6 +73,8 @@ export default function App() {
           dengan tenaga kesehatan untuk penanganan yang tepat.
         </p>
       </footer>
+
+      <ChatWidget />
     </div>
   );
 }

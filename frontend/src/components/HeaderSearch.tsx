@@ -33,7 +33,7 @@ export function HeaderSearch() {
           placeholder="Cari penyakit atau gejala..."
           aria-label="Cari penyakit atau gejala"
           autoComplete="off"
-          className="w-full pl-9 pr-8 py-2 text-sm border border-input bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+          className="w-full pl-9 pr-8 py-2 text-base sm:text-sm border border-input bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
         />
         {query && (
           <button
