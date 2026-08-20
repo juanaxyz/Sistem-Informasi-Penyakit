@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { ImagePlus, ScanLine, Upload, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { FadeIn } from "@/components/FadeIn";
 import { Button } from "@/components/ui/button";
 
 const SAMPLE_RESULTS = [
@@ -44,30 +45,34 @@ export default function XRayAnalysisPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <header className="text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-pine">
-          Analisis X-Ray
-        </p>
-        <h1 className="mt-3 font-display text-3xl md:text-4xl font-medium text-ink tracking-tight text-balance">
-          Unggah, lihat pratinjau, analisis.
-        </h1>
-        <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground leading-relaxed text-pretty">
-          Demo alur kerja analisis gambar dada. Hasil di halaman ini adalah
-          contoh dan tidak boleh dipakai untuk keputusan medis.
-        </p>
-      </header>
+      <FadeIn>
+        <header className="text-center">
+          <p className="font-mono text-xs uppercase tracking-widest text-pine">
+            Analisis X-Ray
+          </p>
+          <h1 className="mt-3 font-display text-3xl md:text-4xl font-medium text-ink tracking-tight text-balance">
+            Unggah, lihat pratinjau, analisis.
+          </h1>
+          <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground leading-relaxed text-pretty">
+            Demo alur kerja analisis gambar dada. Hasil di halaman ini adalah
+            contoh dan tidak boleh dipakai untuk keputusan medis.
+          </p>
+        </header>
+      </FadeIn>
 
-      <ol className="mt-8 flex items-center justify-center gap-2 font-mono text-xs text-muted-foreground">
-        {["Unggah", "Pratinjau", "Hasil"].map((s, i) => {
-          const done = (imageUrl != null && i <= 1) || (resultDone && i <= 2);
-          return (
-            <li key={s} className="flex items-center gap-2">
-              {i > 0 && <span className="opacity-40">/</span>}
-              <span className={done ? "text-pine" : ""}>{s}</span>
-            </li>
-          );
-        })}
-      </ol>
+      <FadeIn delay={0.1}>
+        <ol className="mt-8 flex items-center justify-center gap-2 font-mono text-xs text-muted-foreground">
+          {["Unggah", "Pratinjau", "Hasil"].map((s, i) => {
+            const done = (imageUrl != null && i <= 1) || (resultDone && i <= 2);
+            return (
+              <li key={s} className="flex items-center gap-2">
+                {i > 0 && <span className="opacity-40">/</span>}
+                <span className={done ? "text-pine" : ""}>{s}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </FadeIn>
 
       <motion.section
         layout

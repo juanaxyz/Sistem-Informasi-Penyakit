@@ -57,13 +57,13 @@ export default function App() {
         </Routes>
       </main>
 
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
+      <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
         <Dock
           className="bg-background"
           items={items}
-          panelHeight={68}
-          baseItemSize={50}
-          magnification={70}
+          panelHeight={60}
+          baseItemSize={48}
+          magnification={60}
         />
       </div>
 

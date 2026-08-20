@@ -1,5 +1,3 @@
-"use client";
-
 import {
   motion,
   MotionValue,
@@ -139,7 +137,7 @@ export default function Dock({
           isHovered.set(0);
           mouseX.set(Infinity);
         }}
-        className={`${className} absolute bottom-2 left-1/2 transform -translate-x-1/2 flex items-end w-fit gap-3 rounded-2xl border border-border bg-white/85 backdrop-blur-md shadow-lg shadow-pine/5 pb-2 px-3`}
+        className={`${className} cursor-pointer absolute bottom-2 left-1/2 transform -translate-x-1/2 flex items-end w-fit gap-3 rounded-2xl border border-border bg-white/85 backdrop-blur-md shadow-lg shadow-pine/5 pb-2 px-3`}
         style={{ height: panelHeight }}
         role="toolbar"
         aria-label="Navigasi aplikasi"

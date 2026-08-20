@@ -44,9 +44,7 @@ export function ChatWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string>(() =>
-    crypto.randomUUID(),
-  );
+  const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
 
   useEffect(() => {
     if (!open) return;
@@ -75,7 +73,11 @@ export function ChatWidget() {
     setLoading(true);
 
     try {
-      const result = await api.chat({ question: text, session_id: sessionId, history });
+      const result = await api.chat({
+        question: text,
+        session_id: sessionId,
+        history,
+      });
       if (result.session_id) setSessionId(result.session_id);
       setMessages((prev) => [...prev, { from: "bot", text: result.answer }]);
     } catch {
@@ -101,7 +103,7 @@ export function ChatWidget() {
         aria-expanded={open}
         aria-controls="chat-widget-panel"
         aria-label={open ? "Tutup chat" : "Buka chat"}
-        className="fixed bottom-4 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="fixed cursor-pointer bottom-4 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {open ? (
           <X className="h-6 w-6" aria-hidden="true" />
@@ -124,7 +126,9 @@ export function ChatWidget() {
                 <MessageCircle className="h-4 w-4" aria-hidden="true" />
               </span>
               <div>
-                <p className="text-sm font-medium text-ink">Asisten Kesehatan</p>
+                <p className="text-sm font-medium text-ink">
+                  Asisten Kesehatan
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Informasi edukasi, bukan diagnosis
                 </p>
@@ -147,7 +151,9 @@ export function ChatWidget() {
             {messages.map((m, i) => (
               <div
                 key={i}
-                className={m.from === "user" ? "flex justify-end" : "flex justify-start"}
+                className={
+                  m.from === "user" ? "flex justify-end" : "flex justify-start"
+                }
               >
                 <p
                   className={
