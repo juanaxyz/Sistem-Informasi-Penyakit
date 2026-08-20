@@ -5,15 +5,12 @@ export type Tampilan = "depan" | "belakang";
 export interface BodyPartRecord {
   id: number;
   nama: string;
-  slug: string;
   tampilan: Tampilan;
 }
 
 export interface SystemRecord {
   id: number;
   nama: string;
-  slug: string;
-  deskripsi: string | null;
   /** Jumlah penyakit yang terkait di bagian tubuh ybs (dari byBody). */
   jumlah_penyakit?: number;
 }
@@ -24,31 +21,18 @@ export interface Disease {
   nama: string;
   slug: string;
   ringkasan: string | null;
+  thumbnail: string | null;
   tingkat_urgensi: UrgencyLevel;
 }
 
 export interface Referensi {
   id: number;
-  judul: string;
-  sumber: string | null;
   url: string | null;
-  tahun: number | null;
 }
 
-export interface ContentImage {
+export interface Artikel {
   id: number;
-  url_gambar: string;
-  caption: string | null;
-  urutan: number;
-}
-
-export interface DiseaseContent {
-  id: number;
-  judul: string;
-  slug: string;
-  isi: string;
-  urutan: number;
-  gambar_konten: ContentImage[];
+  konten: string;
 }
 
 /** Detail lengkap satu penyakit (halaman detail). */
@@ -58,10 +42,11 @@ export interface DiseaseDetail {
   nama: string;
   slug: string;
   ringkasan: string | null;
+  thumbnail: string | null;
   tingkat_urgensi: UrgencyLevel;
-  sistem_tubuh: Pick<SystemRecord, "id" | "nama" | "slug" | "deskripsi"> | null;
-  konten: DiseaseContent[];
-  bagian_tubuh: Pick<BodyPartRecord, "id" | "nama" | "slug">[];
+  sistem_tubuh: Pick<SystemRecord, "id" | "nama"> | null;
+  artikel: Artikel[];
+  bagian_tubuh: Pick<BodyPartRecord, "id" | "nama">[];
   referensi: Referensi[];
 }
 
@@ -74,8 +59,8 @@ export interface ChatTurn {
 /** Satu chunk hasil retrieval RAG (dari knowledge_embeddings). */
 export interface ChatSource {
   source_type: "disease" | "faq";
-  source_id: number | null;
-  penyakit_id: number | null;
+  id_artikel: number | null;
+  id_faq: number | null;
   content: string;
   similarity: number;
 }

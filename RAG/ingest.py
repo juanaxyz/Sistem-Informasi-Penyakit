@@ -1,6 +1,5 @@
-import re
+import hashlib
 import sys
-from pathlib import Path
 
 from supabase import create_client
 
@@ -11,61 +10,53 @@ from app.config import (
 )
 from app.services.embedding import generate_embedding
 
-KNOWLEDGE_BASE_PATH = Path(__file__).parent / "RAG_KNOWLEDGE_BASE.md"
+
+def content_sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def fetch_disease_sections(supabase):
     penyakit = supabase.table("penyakit").select("id, nama").execute().data
-    konten = (
-        supabase.table("konten_penyakit")
-        .select("id, id_penyakit, judul, isi")
-        .eq("tampilkan", True)
+    artikel = (
+        supabase.table("artikel")
+        .select("id, id_penyakit, konten")
         .execute()
         .data
     )
 
     nama_by_id = {p["id"]: p["nama"] for p in penyakit}
     sections = []
-    for k in konten:
-        nama = nama_by_id.get(k["id_penyakit"])
+    for a in artikel:
+        nama = nama_by_id.get(a["id_penyakit"])
         if not nama:
             continue
-        isi = (k.get("isi") or "").strip()
-        if not isi:
+        konten = (a.get("konten") or "").strip()
+        if not konten:
             continue
+        content = f"Nama: {nama}\n{konten}"
         sections.append(
             {
                 "source_type": "disease",
-                "source_id": k["id"],
-                "penyakit_id": k["id_penyakit"],
-                "content": f"Nama: {nama}\n{k['judul']}: {isi}",
+                "id_artikel": a["id"],
+                "content": content,
+                "content_hash": content_sha256(content),
             }
         )
     return sections
 
 
-def parse_faqs() -> list[dict]:
-    text = KNOWLEDGE_BASE_PATH.read_text(encoding="utf-8")
-    entries = re.split(r"(?m)^## ENTRI", text)[1:]
-
+def fetch_faqs(supabase) -> list[dict]:
+    rows = supabase.table("faq").select("id, pertanyaan, jawaban").execute().data
     faqs = []
-    for entry in entries:
-        topik = re.search(r"\*\*Topik:\*\*\s*(.+)", entry)
-        pertanyaan = re.search(r"\*\*Pertanyaan terkait:\*\*\s*(.+)", entry)
-        jawaban_match = re.search(r"\*\*Jawaban:\*\*\s*(.+)", entry, re.DOTALL)
-        if not (topik and pertanyaan and jawaban_match):
-            continue
-        jawaban = jawaban_match.group(1).strip().rstrip("-")
+    for row in rows:
+        content = f"Pertanyaan: {row['pertanyaan']}\nJawaban: {row['jawaban']}"
         faqs.append(
             {
                 "source_type": "faq",
-                "source_id": None,
-                "penyakit_id": None,
-                "content": (
-                    f"Topik: {topik.group(1).strip()}\n"
-                    f"Pertanyaan terkait: {pertanyaan.group(1).strip()}\n"
-                    f"Jawaban: {jawaban}"
-                ),
+                "id_artikel": None,
+                "id_faq": row["id"],
+                "content": content,
+                "content_hash": content_sha256(content),
             }
         )
     return faqs
@@ -82,7 +73,7 @@ def main() -> None:
     supabase.table("knowledge_embeddings").delete().gte("id", 0).execute()
 
     disease_rows = fetch_disease_sections(supabase)
-    faq_rows = parse_faqs()
+    faq_rows = fetch_faqs(supabase)
     all_rows = disease_rows + faq_rows
 
     print(f"Rows to embed: disease={len(disease_rows)}, faq={len(faq_rows)}")
@@ -92,9 +83,10 @@ def main() -> None:
         supabase.table("knowledge_embeddings").insert(
             {
                 "source_type": row["source_type"],
-                "source_id": row["source_id"],
-                "penyakit_id": row["penyakit_id"],
+                "id_artikel": row["id_artikel"],
+                "id_faq": row.get("id_faq"),
                 "content": row["content"],
+                "content_hash": row["content_hash"],
                 "embedding": vector,
             }
         ).execute()

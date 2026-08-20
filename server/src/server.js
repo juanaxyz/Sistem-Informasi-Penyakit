@@ -42,7 +42,7 @@ app.get(
   handle(async (_req, res) => {
     const { data, error } = await db
       .from("bagian_tubuh")
-      .select("id, nama, slug, tampilan")
+      .select("id, nama, tampilan")
       .order("id", { ascending: true });
     if (error) throw error;
 
@@ -55,33 +55,55 @@ app.get(
   "/api/sistem-tubuh/byBody/:idBody",
   handle(async (req, res) => {
     const idBody = validateId(req.params.idBody);
+
     if (idBody === null) {
-      return res.status(400).json({ error: "id bagian tubuh tidak valid" });
+      return res.status(400).json({
+        error: "id bagian tubuh tidak valid",
+      });
     }
 
     const { data, error } = await db
       .from("penyakit_bagian_tubuh")
-      .select("penyakit!inner (sistem_tubuh!inner (*))")
+      .select(
+        `
+        penyakit!inner (
+          sistem_tubuh!inner (
+            id,
+            nama
+          )
+        )
+      `,
+      )
       .eq("id_bagian_tubuh", idBody);
+
     if (error) throw error;
 
     const systemById = new Map();
-    for (const item of data) {
-      const system = item.penyakit.sistem_tubuh;
+
+    for (const item of data ?? []) {
+      const system = item.penyakit?.sistem_tubuh;
+
+      if (!system) continue;
+
       const current = systemById.get(system.id);
+
       if (current) {
         current.jumlah_penyakit += 1;
       } else {
-        systemById.set(system.id, { ...system, jumlah_penyakit: 1 });
+        systemById.set(system.id, {
+          ...system,
+          jumlah_penyakit: 1,
+        });
       }
     }
 
     const sistemTubuh = [...systemById.values()];
 
-    res.json({ sistem_tubuh: sistemTubuh });
+    res.json({
+      sistem_tubuh: sistemTubuh,
+    });
   }),
 );
-
 // Penyakit di bagian tubuh + sistem tubuh sekaligus
 app.get(
   "/api/penyakit/bySystemAndBody/:idBody/:idSystem",
@@ -95,7 +117,7 @@ app.get(
     const { data, error } = await db
       .from("penyakit")
       .select(
-        "id, nama, slug, ringkasan, tingkat_urgensi, penyakit_bagian_tubuh!inner (id_bagian_tubuh)",
+        "id, nama, slug, ringkasan, thumbnail, tingkat_urgensi, penyakit_bagian_tubuh!inner (id_bagian_tubuh)",
       )
       .eq("id_sistem_tubuh", idSystem)
       .eq("penyakit_bagian_tubuh.id_bagian_tubuh", idBody)
@@ -121,11 +143,11 @@ app.get(
     const [namaRes, ringkasanRes] = await Promise.all([
       db
         .from("penyakit")
-        .select("id, nama, slug, ringkasan, tingkat_urgensi")
+        .select("id, nama, slug, ringkasan, thumbnail, tingkat_urgensi")
         .ilike("nama", pattern),
       db
         .from("penyakit")
-        .select("id, nama, slug, ringkasan, tingkat_urgensi")
+        .select("id, nama, slug, ringkasan, thumbnail, tingkat_urgensi")
         .ilike("ringkasan", pattern),
     ]);
     if (namaRes.error) throw namaRes.error;
@@ -144,7 +166,7 @@ app.get(
   }),
 );
 
-// Blok konten satu penyakit (ringkas — judul, isi, urutan)
+// Artikel satu penyakit (Markdown content)
 app.get(
   "/api/penyakit/:idPenyakit/konten",
   handle(async (req, res) => {
@@ -154,11 +176,10 @@ app.get(
     }
 
     const { data, error } = await db
-      .from("konten_penyakit")
-      .select("judul, isi, urutan")
+      .from("artikel")
+      .select("id, konten")
       .eq("id_penyakit", idPenyakit)
-      .eq("tampilkan", true)
-      .order("urutan", { ascending: true });
+      .order("id", { ascending: true });
     if (error) throw error;
 
     res.json({ konten: data ?? [] });
@@ -175,44 +196,40 @@ app.get(
       return res.status(400).json({ error: "id penyakit tidak valid" });
     }
 
-    const [diseaseRes, kontenRes, bagianRes, referensiRes] = await Promise.all([
-      db
-        .from("penyakit")
-        .select(
-          "id, id_sistem_tubuh, nama, slug, ringkasan, tingkat_urgensi, sistem_tubuh (id, nama, slug, deskripsi)",
-        )
-        .eq("id", idPenyakit)
-        .maybeSingle(),
-      db
-        .from("konten_penyakit")
-        .select("id, judul, slug, isi, urutan, gambar_konten (id, url_gambar, caption, urutan)")
-        .eq("id_penyakit", idPenyakit)
-        .eq("tampilkan", true)
-        .order("urutan", { ascending: true }),
-      db
-        .from("penyakit_bagian_tubuh")
-        .select("bagian_tubuh (id, nama, slug, tampilan)")
-        .eq("id_penyakit", idPenyakit)
-        .order("id", { referencedTable: "bagian_tubuh" }),
-      db
-        .from("referensi")
-        .select("id, judul, sumber, url, tahun")
-        .eq("id_penyakit", idPenyakit)
-        .order("id", { ascending: true }),
-    ]);
+    const [diseaseRes, artikelRes, bagianRes, referensiRes] = await Promise.all(
+      [
+        db
+          .from("penyakit")
+          .select(
+            "id, id_sistem_tubuh, nama, slug, ringkasan, thumbnail, tingkat_urgensi, sistem_tubuh (id, nama)",
+          )
+          .eq("id", idPenyakit)
+          .maybeSingle(),
+        db
+          .from("artikel")
+          .select("id, konten")
+          .eq("id_penyakit", idPenyakit)
+          .order("id", { ascending: true }),
+        db
+          .from("penyakit_bagian_tubuh")
+          .select("bagian_tubuh (id, nama, tampilan)")
+          .eq("id_penyakit", idPenyakit)
+          .order("id", { referencedTable: "bagian_tubuh" }),
+        db
+          .from("referensi")
+          .select("id, url")
+          .eq("id_penyakit", idPenyakit)
+          .order("id", { ascending: true }),
+      ],
+    );
 
-    for (const r of [diseaseRes, kontenRes, bagianRes, referensiRes]) {
+    for (const r of [diseaseRes, artikelRes, bagianRes, referensiRes]) {
       if (r.error) throw r.error;
     }
 
     if (!diseaseRes.data) {
       return res.status(404).json({ error: "penyakit tidak ditemukan" });
     }
-
-    const konten = (kontenRes.data ?? []).map((k) => ({
-      ...k,
-      gambar_konten: k.gambar_konten ?? [],
-    }));
 
     const bagian_tubuh = (bagianRes.data ?? []).flatMap((r) =>
       r.bagian_tubuh ? [r.bagian_tubuh] : [],
@@ -221,7 +238,7 @@ app.get(
     res.json({
       penyakit: {
         ...diseaseRes.data,
-        konten,
+        artikel: artikelRes.data ?? [],
         bagian_tubuh,
         referensi: referensiRes.data ?? [],
       },
@@ -265,6 +282,10 @@ app.post(
   }),
 );
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+module.exports = app;

@@ -248,7 +248,5 @@ supabase
 
 ## Rujukan dokumen terkait
 
-- `RAG_KNOWLEDGE_BASE.md` — sumber konten `source_type = 'faq'`
-- Skema Supabase: `penyakit`, `konten_penyakit`, `referensi`, `penyakit_bagian_tubuh`, `bagian_tubuh`, `sistem_tubuh`, `gambar_konten`
 - Frontend: `src/lib/api.ts`, `src/components/ChatWidget.tsx`
 - BFF: `server/src/server.js`
