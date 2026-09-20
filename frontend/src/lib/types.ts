@@ -72,3 +72,31 @@ export interface ChatResult {
   sources: ChatSource[];
   session_id?: string | null;
 }
+
+export type UserRole = "user" | "admin";
+
+export interface User {
+  id: number;
+  nama: string;
+  email: string;
+  username: string;
+  role: UserRole;
+  dibuat_pada?: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
+export interface RegisterPayload {
+  nama: string;
+  email: string;
+  username: string;
+  password: string;
+}
+
+export interface LoginPayload {
+  identifier: string;
+  password: string;
+}

@@ -2,9 +2,11 @@ const request = require("supertest");
 
 // 1. Mock Supabase sebelum server di-require
 const mockFrom = jest.fn();
+const mockRpc = jest.fn();
 jest.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     from: mockFrom,
+    rpc: mockRpc,
   }),
 }));
 
@@ -255,6 +257,77 @@ describe("API Test Suite", () => {
 
       expect(res.status).toBe(500);
       expect(res.body).toHaveProperty("error", "RAG Service Unavailable");
+    });
+  });
+
+  // --- AUTH ---
+  describe("AUTH Endpoints", () => {
+    describe("POST /api/auth/register", () => {
+      it("harus 400 jika field ada yang kosong", async () => {
+        const res = await request(app)
+          .post("/api/auth/register")
+          .send({ nama: "Test", email: "test@example.com" });
+        expect(res.status).toBe(400);
+        expect(res.body).toHaveProperty("error");
+      });
+
+      it("harus 201 dan kembalikan token jika register valid", async () => {
+        const mockUser = {
+          id: 1,
+          nama: "Budi",
+          email: "budi@example.com",
+          username: "budi123",
+          role: "user",
+          dibuat_pada: "2026-09-13T00:00:00Z",
+        };
+        mockRpc.mockResolvedValueOnce({ data: [mockUser], error: null });
+
+        const res = await request(app)
+          .post("/api/auth/register")
+          .send({
+            nama: "Budi",
+            email: "budi@example.com",
+            username: "budi123",
+            password: "password123",
+          });
+
+        expect(res.status).toBe(201);
+        expect(res.body).toHaveProperty("token");
+        expect(res.body.user).toEqual(mockUser);
+      });
+    });
+
+    describe("POST /api/auth/login", () => {
+      it("harus 400 jika identifier/password kosong", async () => {
+        const res = await request(app)
+          .post("/api/auth/login")
+          .send({ identifier: "" });
+        expect(res.status).toBe(400);
+      });
+
+      it("harus 401 jika user tidak ditemukan", async () => {
+        mockRpc.mockResolvedValueOnce({ data: [], error: null });
+        const res = await request(app)
+          .post("/api/auth/login")
+          .send({ identifier: "unknown@example.com", password: "password123" });
+        expect(res.status).toBe(401);
+        expect(res.body.error).toBe("Email/username atau password salah");
+      });
+    });
+
+    describe("POST /api/auth/logout", () => {
+      it("harus 200 dengan pesan logout berhasil", async () => {
+        const res = await request(app).post("/api/auth/logout");
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ message: "Logout berhasil" });
+      });
+    });
+
+    describe("GET /api/auth/me", () => {
+      it("harus 401 jika token tidak disertakan", async () => {
+        const res = await request(app).get("/api/auth/me");
+        expect(res.status).toBe(401);
+      });
     });
   });
 });
