@@ -586,7 +586,7 @@ app.get(
   }),
 );
 
-// Detail lengkap satu penyakit: header, sistem_tubuh, konten (+gambar),
+// Detail lengkap satu penyakit: header, sistem_tubuh, artikel (dengan bagian-bagiannya),
 // bagian_tubuh (relasi many-to-many), referensi.
 app.get(
   "/api/penyakit/:idPenyakit",
@@ -607,7 +607,7 @@ app.get(
           .maybeSingle(),
         db
           .from("artikel")
-          .select("id, konten")
+          .select("id, status, ditinjau_pada, artikel_bagian(id, tipe, judul, urutan, konten)")
           .eq("id_penyakit", idPenyakit)
           .order("id", { ascending: true }),
         db
@@ -635,10 +635,23 @@ app.get(
       r.bagian_tubuh ? [r.bagian_tubuh] : [],
     );
 
+    // Flatten / sort artikel_bagian per artikel
+    const artikel = (artikelRes.data ?? []).map((art) => {
+      const bagianSorted = (art.artikel_bagian || []).sort(
+        (a, b) => (a.urutan ?? 0) - (b.urutan ?? 0),
+      );
+      return {
+        id: art.id,
+        status: art.status,
+        ditinjau_pada: art.ditinjau_pada,
+        bagian: bagianSorted,
+      };
+    });
+
     res.json({
       penyakit: {
         ...diseaseRes.data,
-        artikel: artikelRes.data ?? [],
+        artikel,
         bagian_tubuh,
         referensi: referensiRes.data ?? [],
       },

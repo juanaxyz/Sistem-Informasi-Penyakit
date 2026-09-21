@@ -183,18 +183,25 @@ export function DiseaseDetailPage() {
             </header>
           </FadeIn>
           {data.artikel.length > 0 && (
-            <div>
+            <div className="space-y-8 mt-6">
               {data.artikel.map((article) => (
-                <section key={article.id} className="mt-8 px-8 md:mt-9">
-                  <div className="font-serif text-justify leading-loose prose max-w-none ">
-                    <Markdown
-                      remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
-                      components={CustomTableComponents}
-                    >
-                      {article.konten}
-                    </Markdown>
-                  </div>
-                </section>
+                <div key={article.id} className="space-y-8">
+                  {article.bagian && article.bagian.length > 0 ? (
+                    article.bagian.map((sec) => (
+                      <section key={sec.id || sec.urutan} className="space-y-3">
+                        {sec.judul && <ArticleHeading>{sec.judul}</ArticleHeading>}
+                        <div className="font-serif text-justify leading-loose prose max-w-none px-1">
+                          <Markdown
+                            remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
+                            components={CustomTableComponents}
+                          >
+                            {sec.konten}
+                          </Markdown>
+                        </div>
+                      </section>
+                    ))
+                  ) : null}
+                </div>
               ))}
             </div>
           )}

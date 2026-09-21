@@ -32,7 +32,9 @@ export interface Referensi {
 
 export interface Artikel {
   id: number;
-  konten: string;
+  status?: string;
+  ditinjau_pada?: string | null;
+  bagian: ArtikelBagian[];
 }
 
 /** Detail lengkap satu penyakit (halaman detail). */
