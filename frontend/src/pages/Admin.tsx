@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/api";
@@ -6,21 +6,47 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { FadeIn } from "@/components/FadeIn";
+import { BodyMap } from "@/components/bodyMap/BodyMap";
 import type { UrgencyLevel, BodyPartRecord, SystemRecord, ArtikelBagian } from "@/lib/types";
+
+interface PenyakitListItem {
+  id: number;
+  nama: string;
+  slug: string;
+  ringkasan: string | null;
+  thumbnail: string | null;
+  tingkat_urgensi: UrgencyLevel;
+  id_sistem_tubuh?: number;
+  sistem_tubuh_nama?: string;
+  sistem_tubuh?: { id: number; nama: string } | null;
+  code?: string | null;
+}
+
+interface ArtikelListItem {
+  id: number;
+  id_penyakit?: number;
+  judul: string;
+  konten: string;
+  penyakit_nama: string;
+}
 
 export default function Admin() {
   const { user } = useAuth();
   
   // Lists data
-  const [penyakitList, setPenyakitList] = useState<Array<any>>([]);
-  const [artikelList, setArtikelList] = useState<Array<any>>([]);
+  const [penyakitList, setPenyakitList] = useState<PenyakitListItem[]>([]);
+  const [artikelList, setArtikelList] = useState<ArtikelListItem[]>([]);
   const [sistemTubuhList, setSistemTubuhList] = useState<SystemRecord[]>([]);
   const [bodyPartList, setBodyPartList] = useState<BodyPartRecord[]>([]);
   
   // Selection & Mode
   const [editMode, setEditMode] = useState<"penyakit" | "artikel" | null>(null);
-  const [selectedPenyakit, setSelectedPenyakit] = useState<any>(null);
-  const [selectedArtikel, setSelectedArtikel] = useState<any>(null);
+  const [selectedPenyakit, setSelectedPenyakit] = useState<PenyakitListItem | null>(null);
+  const [selectedArtikel, setSelectedArtikel] = useState<ArtikelListItem | null>(null);
+
+  // Modal state for penyakit form
+  const [showPenyakitModal, setShowPenyakitModal] = useState(false);
+  const penyakitModalRef = useRef<HTMLDialogElement>(null);
   
   // Penyakit Form State
   const [penyakitForm, setPenyakitForm] = useState<{
@@ -51,20 +77,34 @@ export default function Admin() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
+  const openPenyakitModal = () => setShowPenyakitModal(true);
+  const closePenyakitModal = () => setShowPenyakitModal(false);
+
+  // Helper untuk memuat daftar penyakit (all atau fallback ke pencarian)
+  const loadPenyakitList = async (): Promise<PenyakitListItem[]> => {
+    const all = await api.getAllPenyakit().catch(() => null);
+    if (all) return all.penyakit ?? [];
+    const fallback = await api.searchDiseases("");
+    return fallback.penyakit.map((p) => ({
+      id: p.id,
+      nama: p.nama,
+      slug: p.slug,
+      ringkasan: p.ringkasan,
+      thumbnail: p.thumbnail,
+      tingkat_urgensi: p.tingkat_urgensi,
+    }));
+  };
 
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [penyakitRes, artikelRes, sistemRes, bodyPartsRes] = await Promise.all([
-        api.getAllPenyakit().catch(() => api.searchDiseases("").then(r => ({ penyakit: r.penyakit as any }))),
+      const [penyakitList, artikelRes, sistemRes, bodyPartsRes] = await Promise.all([
+        loadPenyakitList(),
         api.getArtikelList(),
         api.getSistemTubuh(),
         api.getBodyParts(),
       ]);
-      setPenyakitList(penyakitRes.penyakit || []);
+      setPenyakitList(penyakitList);
       setArtikelList(artikelRes.artikel || []);
       setSistemTubuhList(sistemRes.sistem_tubuh || []);
       setBodyPartList(bodyPartsRes.bagian_tubuh || []);
@@ -79,6 +119,24 @@ export default function Admin() {
     }
   };
 
+  // Jalankan setelah fetchInitialData dideklarasikan
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sinkronkan state modal ke native <dialog>
+  useEffect(() => {
+    const dialog = penyakitModalRef.current;
+    if (!dialog) return;
+    if (showPenyakitModal && !dialog.open) {
+      dialog.showModal();
+    } else if (!showPenyakitModal && dialog.open) {
+      dialog.close();
+    }
+  }, [showPenyakitModal]);
+
   // --- HANDLER PENYAKIT ---
   const handleNewPenyakit = () => {
     setSelectedPenyakit(null);
@@ -92,14 +150,13 @@ export default function Admin() {
       code: "",
       bagian_tubuhIds: [],
     });
-    setEditMode("penyakit");
     setError(null);
     setSuccess(null);
+    openPenyakitModal();
   };
 
-  const handleSelectPenyakit = async (penyakit: any) => {
+  const handleSelectPenyakit = async (penyakit: PenyakitListItem) => {
     setSelectedPenyakit(penyakit);
-    setEditMode("penyakit");
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -113,9 +170,10 @@ export default function Admin() {
         thumbnail: p.thumbnail ?? "",
         tingkat_urgensi: p.tingkat_urgensi,
         id_sistem_tubuh: p.id_sistem_tubuh,
-        code: (p as any).code ?? "",
+        code: (p as PenyakitListItem).code ?? "",
         bagian_tubuhIds: (p.bagian_tubuh || []).map((b) => b.id),
       });
+      openPenyakitModal();
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError("Gagal memuat detail penyakit");
@@ -155,10 +213,10 @@ export default function Admin() {
         setSuccess("Penyakit baru berhasil ditambahkan");
       }
       // Refresh list
-      const res = await api.getAllPenyakit().catch(() => api.searchDiseases("").then(r => ({ penyakit: r.penyakit as any })));
-      setPenyakitList(res.penyakit || []);
+      const refreshed = await loadPenyakitList();
+      setPenyakitList(refreshed);
       setSelectedPenyakit(null);
-      setEditMode(null);
+      closePenyakitModal();
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError("Gagal menyimpan data penyakit");
@@ -168,7 +226,7 @@ export default function Admin() {
   };
 
   // --- HANDLER ARTIKEL (MULTI-BAGIAN) ---
-  const handleSelectArtikel = async (artikel: any) => {
+  const handleSelectArtikel = async (artikel: ArtikelListItem) => {
     setSelectedArtikel(artikel);
     setEditMode("artikel");
     setLoading(true);
@@ -357,171 +415,189 @@ export default function Admin() {
               </div>
             )}
 
-            {editMode === "penyakit" && (selectedPenyakit || penyakitForm) && (selectedPenyakit !== null || editMode === "penyakit") && selectedPenyakit !== undefined && (
-              <form onSubmit={handleSavePenyakit} className="space-y-6">
-                <div className="flex items-center justify-between pb-3 border-b border-border">
-                  <h3 className="font-display text-xl text-ink font-semibold">
-                    {selectedPenyakit ? `Edit Penyakit: ${selectedPenyakit.nama}` : "Tambah Penyakit Baru"}
-                  </h3>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedPenyakit(null);
-                      setEditMode("penyakit");
-                    }}
-                  >
-                    Batal
-                  </Button>
-                </div>
+            {/* Native <dialog> modal untuk Tambah/Edit Penyakit */}
+            <dialog
+              ref={penyakitModalRef}
+              onClose={closePenyakitModal}
+              onCancel={(e) => { e.preventDefault(); closePenyakitModal(); }}
+              className="m-auto w-[min(92vw,56rem)] max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-background p-0 shadow-2xl backdrop:bg-black/40 backdrop:backdrop-blur-sm"
+            >
+              {showPenyakitModal && (
+                <form onSubmit={handleSavePenyakit} className="p-6 space-y-6">
+                  <div className="flex items-center justify-between pb-3 border-b border-border">
+                    <h3 className="font-display text-xl text-ink font-semibold">
+                      {selectedPenyakit ? `Edit Penyakit: ${selectedPenyakit.nama}` : "Tambah Penyakit Baru"}
+                    </h3>
+                    <Button type="button" variant="ghost" size="sm" onClick={closePenyakitModal}>
+                      Tutup
+                    </Button>
+                  </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                  {error && (
+                    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                        Nama Penyakit *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={penyakitForm.nama}
+                        onChange={(e) => setPenyakitForm({ ...penyakitForm, nama: e.target.value })}
+                        placeholder="Contoh: Tuberkulosis (TBC)"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                        Slug URL *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={penyakitForm.slug}
+                        onChange={(e) => setPenyakitForm({ ...penyakitForm, slug: e.target.value })}
+                        placeholder="contoh: tuberkulosis"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                        Sistem Tubuh Terkait *
+                      </label>
+                      <select
+                        required
+                        value={penyakitForm.id_sistem_tubuh}
+                        onChange={(e) => setPenyakitForm({ ...penyakitForm, id_sistem_tubuh: Number(e.target.value) })}
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                      >
+                        <option value="">Pilih Sistem Organ</option>
+                        {sistemTubuhList.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.nama}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                        Tingkat Urgensi
+                      </label>
+                      <select
+                        value={penyakitForm.tingkat_urgensi}
+                        onChange={(e) => setPenyakitForm({ ...penyakitForm, tingkat_urgensi: e.target.value as UrgencyLevel })}
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                      >
+                        <option value="normal">Normal (Konsultasi rutin)</option>
+                        <option value="waspada">Waspada (Butuh perhatian)</option>
+                        <option value="darurat">Darurat (Gawat darurat)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                        Kode AI / Model Map
+                      </label>
+                      <input
+                        type="text"
+                        value={penyakitForm.code}
+                        onChange={(e) => setPenyakitForm({ ...penyakitForm, code: e.target.value })}
+                        placeholder="Contoh: TBC, COVID_19"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                        Thumbnail Path / URL
+                      </label>
+                      <input
+                        type="text"
+                        value={penyakitForm.thumbnail}
+                        onChange={(e) => setPenyakitForm({ ...penyakitForm, thumbnail: e.target.value })}
+                        placeholder="/images/penyakit/tbc.jpg"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-                      Nama Penyakit *
+                      Ringkasan Singkat
                     </label>
-                    <input
-                      type="text"
-                      required
-                      value={penyakitForm.nama}
-                      onChange={(e) => setPenyakitForm({ ...penyakitForm, nama: e.target.value })}
-                      placeholder="Contoh: Tuberkulosis (TBC)"
+                    <textarea
+                      rows={2}
+                      value={penyakitForm.ringkasan}
+                      onChange={(e) => setPenyakitForm({ ...penyakitForm, ringkasan: e.target.value })}
+                      placeholder="Penjelasan ringkas 1-2 kalimat untuk kartu pencarian..."
                       className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                     />
                   </div>
 
+                  {/* Relasi Bagian Tubuh — Body Map Multi-Select */}
                   <div>
-                    <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-                      Slug URL *
+                    <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+                      Lokasi / Bagian Tubuh Terkait — klik pada peta tubuh
                     </label>
-                    <input
-                      type="text"
-                      required
-                      value={penyakitForm.slug}
-                      onChange={(e) => setPenyakitForm({ ...penyakitForm, slug: e.target.value })}
-                      placeholder="contoh: tuberkulosis"
-                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
-                    />
+                    <div className="grid gap-4 md:grid-cols-[280px_1fr] md:items-start">
+                      <div className="rounded-lg border border-border bg-muted/20 p-3">
+                        <BodyMap
+                          selectedPartId={null}
+                          onSelectPart={() => {}}
+                          highlightedIds={penyakitForm.bagian_tubuhIds}
+                          multiSelect
+                          onTogglePart={handleToggleBodyPart}
+                          selectedPartMeta={`${penyakitForm.bagian_tubuhIds.length} bagian dipilih`}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Bagian yang dipilih ({penyakitForm.bagian_tubuhIds.length}):
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                          {penyakitForm.bagian_tubuhIds.length === 0 ? (
+                            <span className="text-xs text-muted-foreground italic">
+                              Belum ada bagian tubuh dipilih. Klik area pada peta untuk menandai.
+                            </span>
+                          ) : (
+                            bodyPartList
+                              .filter((bp) => penyakitForm.bagian_tubuhIds.includes(bp.id))
+                              .map((bp) => (
+                                <button
+                                  key={bp.id}
+                                  type="button"
+                                  onClick={() => handleToggleBodyPart(bp.id)}
+                                  className="inline-flex items-center gap-1 rounded-full border border-pine/30 bg-pine/10 px-2.5 py-1 text-xs text-pine hover:bg-pine/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+                                >
+                                  {bp.nama}
+                                  <span aria-hidden="true">×</span>
+                                </button>
+                              ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-                      Sistem Tubuh Terkait *
-                    </label>
-                    <select
-                      required
-                      value={penyakitForm.id_sistem_tubuh}
-                      onChange={(e) => setPenyakitForm({ ...penyakitForm, id_sistem_tubuh: Number(e.target.value) })}
-                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
-                    >
-                      <option value="">Pilih Sistem Organ</option>
-                      {sistemTubuhList.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.nama}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                    <Button type="button" variant="outline" onClick={closePenyakitModal}>
+                      Batal
+                    </Button>
+                    <Button type="submit" disabled={loading} className="bg-pine text-white hover:bg-pine/90">
+                      {loading ? "Menyimpan..." : "Simpan Penyakit"}
+                    </Button>
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-                      Tingkat Urgensi
-                    </label>
-                    <select
-                      value={penyakitForm.tingkat_urgensi}
-                      onChange={(e) => setPenyakitForm({ ...penyakitForm, tingkat_urgensi: e.target.value as UrgencyLevel })}
-                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
-                    >
-                      <option value="normal">Normal (Konsultasi rutin)</option>
-                      <option value="waspada">Waspada (Butuh perhatian)</option>
-                      <option value="darurat">Darurat (Gawat darurat)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-                      Kode AI / Model Map
-                    </label>
-                    <input
-                      type="text"
-                      value={penyakitForm.code}
-                      onChange={(e) => setPenyakitForm({ ...penyakitForm, code: e.target.value })}
-                      placeholder="Contoh: TBC, COVID_19"
-                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-                      Thumbnail Path / URL
-                    </label>
-                    <input
-                      type="text"
-                      value={penyakitForm.thumbnail}
-                      onChange={(e) => setPenyakitForm({ ...penyakitForm, thumbnail: e.target.value })}
-                      placeholder="/images/penyakit/tbc.jpg"
-                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-                    Ringkasan Singkat
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={penyakitForm.ringkasan}
-                    onChange={(e) => setPenyakitForm({ ...penyakitForm, ringkasan: e.target.value })}
-                    placeholder="Penjelasan ringkas 1-2 kalimat untuk kartu pencarian..."
-                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
-                  />
-                </div>
-
-                {/* Relasi Bagian Tubuh Checklist */}
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                    Bagian Tubuh Terkait (Peta Tubuh)
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-3 border border-border rounded-lg bg-muted/20">
-                    {bodyPartList.map((bp) => {
-                      const isChecked = penyakitForm.bagian_tubuhIds.includes(bp.id);
-                      return (
-                        <label
-                          key={bp.id}
-                          className="flex items-center gap-2 text-xs text-ink cursor-pointer hover:text-pine"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleToggleBodyPart(bp.id)}
-                            className="rounded border-border text-pine focus:ring-pine h-3.5 w-3.5"
-                          />
-                          <span>{bp.nama}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-border">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedPenyakit(null);
-                      setEditMode("penyakit");
-                    }}
-                  >
-                    Batal
-                  </Button>
-                  <Button type="submit" disabled={loading} className="bg-pine text-white hover:bg-pine/90">
-                    {loading ? "Menyimpan..." : "Simpan Penyakit"}
-                  </Button>
-                </div>
-              </form>
-            )}
+                </form>
+              )}
+            </dialog>
 
             {/* ======================================================== */}
             {/* DOMAIN ARTIKEL & SECTIONS */}

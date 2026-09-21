@@ -153,12 +153,16 @@ const BodySide = ({
 interface BodyMapProps {
   selectedPartId: number | null;
   onSelectPart: (id: number) => void;
-  /** Bagian yang disorot tanpa "memilih" (multi-highlight, mis. di preview detail). */
+  /** Bagian yang disorot tanpa "memilih" (multi-highlight, mis. di preview detail atau multi-select). */
   highlightedIds?: number[];
   /** false = tampilan pasif tanpa hover/klik dan tanpa legenda interaktif. */
   interactive?: boolean;
   /** Teks tambahan saat bagian terpilih, mis. "Dada · 3 sistem". */
   selectedPartMeta?: string;
+  /** Mode multi-select: klik = toggle id di dalam kumpulan yang disorot (highlightedIds). */
+  multiSelect?: boolean;
+  /** Dipanggil saat multiSelect aktif dan sebuah bagian diklik (toggle). */
+  onTogglePart?: (id: number) => void;
 }
 
 export const BodyMap = ({
@@ -167,6 +171,8 @@ export const BodyMap = ({
   highlightedIds = [],
   interactive = true,
   selectedPartMeta,
+  multiSelect = false,
+  onTogglePart,
 }: BodyMapProps) => {
   const [hoveredPartId, setHoveredPartId] = useState<number | null>(null);
   const [activeView, setActiveView] = useState<"ant" | "post">("ant");
@@ -181,7 +187,11 @@ export const BodyMap = ({
   );
 
   const handleClick = (id: number) => {
-    onSelectPart(id);
+    if (multiSelect && onTogglePart) {
+      onTogglePart(id);
+    } else {
+      onSelectPart(id);
+    }
   };
 
   const handleMouseEnter = (id: number) => {
@@ -203,14 +213,16 @@ export const BodyMap = ({
       : undefined;
 
   const isHover = hoveredPartId != null && hoveredPartId !== selectedPartId;
-  const activeLabel =
-    activeLabelPart == null
-      ? null
-      : isHover
-        ? activeLabelPart.name
-        : selectedPartMeta
-          ? `${activeLabelPart.name}`
-          : activeLabelPart.name;
+
+  let activeLabel: string | null = null;
+  if (activeLabelPart != null && isHover) {
+    activeLabel = activeLabelPart.name;
+  } else if (multiSelect && !isHover) {
+    activeLabel =
+      highlightedIds.length > 0 ? `${highlightedIds.length} bagian dipilih` : null;
+  } else if (activeLabelPart != null) {
+    activeLabel = selectedPartMeta ? `${activeLabelPart.name}` : activeLabelPart.name;
+  }
 
   return (
     <div className="flex flex-col items-center gap-3">
