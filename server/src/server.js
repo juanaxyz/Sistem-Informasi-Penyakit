@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { createClient } = require("@supabase/supabase-js");
+const { Agent, fetch: undiciFetch } = require("undici");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
@@ -12,10 +13,34 @@ const PORT = process.env.PORT || 4000;
 const RAG_API_URL = process.env.RAG_API_URL || "http://localhost:8000";
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_dev"; // should be strong in prod
 
+// Custom undici Agent with shorter keepAlive to avoid stale socket closures
+const agent = new Agent({
+  keepAliveTimeout: 10_000,
+  keepAliveMaxTimeout: 15_000,
+  pipelining: 0,
+});
+
+const customFetchWithRetry = async (url, options, retries = 2) => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await undiciFetch(url, { ...options, dispatcher: agent });
+    } catch (err) {
+      const isSocketErr =
+        err.name === "TypeError" &&
+        (err.message === "terminated" || err.cause?.code === "UND_ERR_SOCKET");
+      if (attempt === retries || !isSocketErr) throw err;
+      await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
+    }
+  }
+};
+
 const db = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { persistSession: false } },
+  {
+    auth: { persistSession: false },
+    global: { fetch: customFetchWithRetry },
+  },
 );
 
 // CORS — origin dari env (pisahkan dengan koma), default mengikuti request origin.
