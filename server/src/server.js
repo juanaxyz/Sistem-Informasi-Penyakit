@@ -730,17 +730,22 @@ app.get(
   handle(async (_req, res) => {
     const { data, error } = await db
       .from("artikel")
-      .select("id, konten, COALESCE((SELECT judul FROM artikel_bagian WHERE id_artikel = artikel.id ORDER BY urutan LIMIT 1), '') AS judul, id_penyakit, penyakit!inner (nama)")
+      .select("id, konten, id_penyakit, artikel_bagian(judul, urutan), penyakit!inner (nama)")
       .order("id_penyakit", { ascending: true })
       .order("id", { ascending: true });
     if (error) throw error;
-    // Map to flat structure for easier consumption
-    const artikelList = (data ?? []).map((a) => ({
-      id: a.id,
-      judul: a.judul ?? "",
-      konten: a.konten ?? "",
-      penyakit_nama: a.penyakit?.nama ?? "",
-    }));
+    // Process data to get the first judul from artikel_bagian (ordered by urutan)
+    const artikelList = (data ?? []).map((artikel) => {
+      // Sort the artikel_bagian by urutan (ascending) and take the first one's judul
+      const sortedBagian = (artikel.artikel_bagian || []).sort((a, b) => a.urutan - b.urutan);
+      const judul = sortedBagian.length > 0 ? sortedBagian[0].judul : "";
+      return {
+        id: artikel.id,
+        judul: judul,
+        konten: artikel.konten ?? "",
+        penyakit_nama: artikel.penyakit?.nama ?? "",
+      };
+    });
     res.json({ artikel: artikelList });
   }),
 );
