@@ -730,27 +730,30 @@ app.get(
   handle(async (_req, res) => {
     const { data, error } = await db
       .from("artikel")
-      .select("id, konten, id_penyakit, artikel_bagian(judul, urutan), penyakit!inner (nama)")
+      .select("id, id_penyakit, artikel_bagian(id, judul, konten, urutan), penyakit!inner (nama)")
       .order("id_penyakit", { ascending: true })
       .order("id", { ascending: true });
     if (error) throw error;
-    // Process data to get the first judul from artikel_bagian (ordered by urutan)
+    // Process to get the first judul and konten from artikel_bagian (ordered by urutan)
     const artikelList = (data ?? []).map((artikel) => {
-      // Sort the artikel_bagian by urutan (ascending) and take the first one's judul
+      // Sort the artikel_bagian by urutan (ascending) and take the first one
       const sortedBagian = (artikel.artikel_bagian || []).sort((a, b) => a.urutan - b.urutan);
-      const judul = sortedBagian.length > 0 ? sortedBagian[0].judul : "";
+      const firstBagian = sortedBagian.length > 0 ? sortedBagian[0] : null;
       return {
         id: artikel.id,
-        judul: judul,
-        konten: artikel.konten ?? "",
+        id_penyakit: artikel.id_penyakit,
+        judul: firstBagian ? firstBagian.judul : "",
+        konten: firstBagian ? firstBagian.konten : "",
         penyakit_nama: artikel.penyakit?.nama ?? "",
+        // We keep the firstBagianId for potential use in update (if needed)
+        firstBagianId: firstBagian ? firstBagian.id : null,
       };
     });
     res.json({ artikel: artikelList });
   }),
 );
 
-// Admin: Update artikel
+// Admin: Update artikel (update the first bagian's konten)
 app.put(
   "/api/artikel/:idArtikel",
   verifyToken,
@@ -766,23 +769,35 @@ app.put(
         .status(400)
         .json({ error: "konten harus disediakan" });
     }
-    const updateData = {
-      konten,
-      diperbarui_pada: new Date().toISOString(),
-    };
+    // Find the first artikel_bagian (by urutan) for this artikel and update its konten
     const { data, error } = await db
-      .from("artikel")
-      .update(updateData)
-      .eq("id", idArtikel);
+      .from("artikel_bagian")
+      .update({ konten, diperbarui_pada: new Date().toISOString() })
+      .eq("id_artikel", idArtikel)
+      .order("urutan", { ascending: true })
+      .limit(1)
+      .single();
+
     if (error) throw error;
-    // Return updated data
-    const { data: updatedData, error: updatedError } = await db
+    // Return updated artikel data (for consistency, we return the artikel with updated konten from the first bagian)
+    // We'll fetch the artikel again to return the updated konten (from the first bagian)
+    const { data: artikelData, error: artikelError } = await db
       .from("artikel")
-      .select("id, konten, diperbarui_pada")
+      .select("id, id_penyakit, artikel_bagian(judul, konten, urutan), penyakit!inner (nama)")
       .eq("id", idArtikel)
       .single();
-    if (updatedError) throw updatedError;
-    res.json({ artikel: updatedData });
+
+    if (artikelError) throw artikelError;
+    const sortedBagian = (artikelData.artikel_bagian || []).sort((a, b) => a.urutan - b.urutan);
+    const firstBagian = sortedBagian.length > 0 ? sortedBagian[0] : null;
+    const updatedArtikel = {
+      id: artikelData.id,
+      id_penyakit: artikelData.id_penyakit,
+      judul: firstBagian ? firstBagian.judul : "",
+      konten: firstBagian ? firstBagian.konten : "",
+      penyakit_nama: artikelData.penyakit?.nama ?? "",
+    };
+    res.json({ artikel: updatedArtikel });
   }),
 );
 

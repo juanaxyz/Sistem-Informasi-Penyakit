@@ -69,21 +69,15 @@ export default function Admin() {
       .finally(() => setLoading(false));
   };
 
-  const handleSelectArtikel = (artikel: any) => {
-    setSelectedArtikel(artikel);
-    setEditMode('artikel');
-    setLoading(true);
-    // For now, we already have the artikel data from the list (includes judul, konten, penyakit_nama)
-    // We'll use that to populate formData
-    setFormData({
-      id: artikel.id,
-      judul: artikel.judul ?? '',
-      konten: artikel.konten ?? '',
-      // We don't have id_penyakit in the list? we do from the join.
-      // We'll keep it for reference but not editable.
-    });
-    setLoading(false);
-  };
+const handleSelectArtikel = (artikel: any) => {
+     setSelectedArtikel(artikel);
+     setEditMode('artikel');
+     setFormData({
+       id: artikel.id,
+       judul: artikel.judul ?? '',
+       konten: artikel.konten ?? '',
+     });
+   };
 
   const handleSave = async () => {
     setLoading(true);
