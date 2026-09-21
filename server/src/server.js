@@ -665,10 +665,76 @@ app.get(
   handle(async (_req, res) => {
     const { data, error } = await db
       .from("penyakit")
-      .select("id, nama, slug, ringkasan, thumbnail, tingkat_urgensi, id_sistem_tubuh")
+      .select("id, nama, slug, ringkasan, thumbnail, tingkat_urgensi, id_sistem_tubuh, sistem_tubuh!inner(nama)")
       .order("nama", { ascending: true });
     if (error) throw error;
-    res.json({ penyakit: data ?? [] });
+    // Map to flat structure for easier consumption
+    const penyakitList = (data ?? []).map((p) => ({
+      id: p.id,
+      nama: p.nama,
+      slug: p.slug,
+      ringkasan: p.ringkasan ?? "",
+      thumbnail: p.thumbnail ?? "",
+      tingkat_urgensi: p.tingkat_urgensi,
+      id_sistem_tubuh: p.id_sistem_tubuh,
+      sistem_tubuh_nama: p.sistem_tubuh?.nama ?? "",
+    }));
+    res.json({ penyakit: penyakitList });
+  }),
+);
+
+// Admin: Create penyakit baru
+app.post(
+  "/api/penyakit",
+  verifyToken,
+  requireRole("admin"),
+  handle(async (req, res) => {
+    const {
+      nama,
+      slug,
+      ringkasan,
+      thumbnail,
+      tingkat_urgensi,
+      id_sistem_tubuh,
+      code,
+      bagian_tubuhIds,
+    } = req.body;
+    // Validasi sederhana
+    if (!nama || !slug || !tingkat_urgensi || !id_sistem_tubuh || !Array.isArray(bagian_tubuhIds)) {
+      return res.status(400).json({
+        error: "nama, slug, tingkat_urgensi, id_sistem_tubuh, dan bagian_tubuhIds wajib diisi",
+      });
+    }
+    // Insert penyakit
+    const { data: penyakitData, error: penyakitError } = await db
+      .from("penyakit")
+      .insert({
+        nama,
+        slug,
+        ringkasan: ringkasan ?? null,
+        thumbnail: thumbnail ?? null,
+        tingkat_urgensi,
+        id_sistem_tubuh,
+        code: code ?? null,
+        diperbarui_pada: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    if (penyakitError) throw penyakitError;
+
+    const idPenyakit = penyakitData.id;
+    // Insert relasi bagian tubuh
+    if (bagian_tubuhIds.length > 0) {
+      const relasi = bagian_tubuhIds.map((id_b) => ({
+        id_penyakit: idPenyakit,
+        id_bagian_tubuh: id_b,
+      }));
+      const { error: relError } = await db
+        .from("penyakit_bagian_tubuh")
+        .insert(relasi);
+      if (relError) throw relError;
+    }
+    res.status(201).json({ penyakit: penyakitData });
   }),
 );
 
@@ -689,12 +755,14 @@ app.put(
       thumbnail,
       tingkat_urgensi,
       id_sistem_tubuh,
+      code,
+      bagian_tubuhIds,
     } = req.body;
     // Validasi sederhana
-    if (!nama || !slug || !tingkat_urgensi) {
-      return res
-        .status(400)
-        .json({ error: "nama, slug, dan tingkat_urgensi wajib diisi" });
+    if (!nama || !slug || !tingkat_urgensi || !id_sistem_tubuh || !Array.isArray(bagian_tubuhIds)) {
+      return res.status(400).json({
+        error: "nama, slug, tingkat_urgensi, id_sistem_tubuh, dan bagian_tubuhIds wajib diisi",
+      });
     }
     const { data, error } = await db
       .from("penyakit")
@@ -704,16 +772,37 @@ app.put(
         ringkasan: ringkasan ?? null,
         thumbnail: thumbnail ?? null,
         tingkat_urgensi,
-        id_sistem_tubuh: id_sistem_tubuh ?? null,
+        id_sistem_tubuh,
+        code: code ?? null,
         diperbarui_pada: new Date().toISOString(),
       })
       .eq("id", idPenyakit);
     if (error) throw error;
+
+    // Hapus relasi lama
+    const { error: delRelError } = await db
+      .from("penyakit_bagian_tubuh")
+      .delete()
+      .eq("id_penyakit", idPenyakit);
+    if (delRelError) throw delRelError;
+
+    // Insert relasi baru
+    if (bagian_tubuhIds.length > 0) {
+      const relasi = bagian_tubuhIds.map((id_b) => ({
+        id_penyakit: idPenyakit,
+        id_bagian_tubuh: id_b,
+      }));
+      const { error: insRelError } = await db
+        .from("penyakit_bagian_tubuh")
+        .insert(relasi);
+      if (insRelError) throw insRelError;
+    }
+
     // Return updated data
     const { data: updatedData, error: updatedError } = await db
       .from("penyakit")
       .select(
-        "id, nama, slug, ringkasan, thumbnail, tingkat_urgensi, id_sistem_tubuh, dibuat_pada, diperbarui_pada"
+        "id, nama, slug, ringkasan, thumbnail, tingkat_urgensi, id_sistem_tubuh, dibuat_pada, diperbarui_pada, code"
       )
       .eq("id", idPenyakit)
       .single();
@@ -798,6 +887,129 @@ app.put(
       penyakit_nama: artikelData.penyakit?.nama ?? "",
     };
     res.json({ artikel: updatedArtikel });
+  }),
+);
+
+// Admin: List sistem tubuh untuk dropdown
+app.get(
+  "/api/sistem-tubuh",
+  verifyToken,
+  requireRole("admin"),
+  handle(async (_req, res) => {
+    const { data, error } = await db
+      .from("sistem_tubuh")
+      .select("id, nama")
+      .order("nama", { ascending: true });
+    if (error) throw error;
+    res.json({ sistem_tubuh: data ?? [] });
+  }),
+);
+
+// Admin: Get semua bagian dari satu artikel (untuk edit form yang mendukung multi bagian)
+app.get(
+  "/api/artikel/:idArtikel/bagian",
+  verifyToken,
+  requireRole("admin"),
+  handle(async (req, res) => {
+    const idArtikel = validateId(req.params.idArtikel);
+    if (idArtikel === null) {
+      return res.status(400).json({ error: "id artikel tidak valid" });
+    }
+    const { data, error } = await db
+      .from("artikel_bagian")
+      .select("id, id_artikel, tipe, judul, konten, urutan, dibuat_pada, diperbarui_pada")
+      .eq("id_artikel", idArtikel)
+      .order("urutan", { ascending: true });
+    if (error) throw error;
+    res.json({ bagian: data ?? [] });
+  }),
+);
+
+// Admin: Simpan semua bagian dari satu artikel (bulk sync: update existing, insert new, delete removed)
+app.put(
+  "/api/artikel/:idArtikel/bagian",
+  verifyToken,
+  requireRole("admin"),
+  handle(async (req, res) => {
+    const idArtikel = validateId(req.params.idArtikel);
+    if (idArtikel === null) {
+      return res.status(400).json({ error: "id artikel tidak valid" });
+    }
+    const { bagian } = req.body;
+    if (!Array.isArray(bagian)) {
+      return res.status(400).json({ error: "bagian harus berupa array" });
+    }
+
+    // Ambil bagian yang ada saat ini
+    const { data: currentData, error: fetchError } = await db
+      .from("artikel_bagian")
+      .select("id")
+      .eq("id_artikel", idArtikel);
+    if (fetchError) throw fetchError;
+
+    const currentIds = (currentData ?? []).map((b) => b.id);
+    const updatedIds = [];
+
+    // Proses insert atau update untuk setiap bagian yang dikirim
+    for (let i = 0; i < bagian.length; i++) {
+      const b = bagian[i];
+      const urutan = b.urutan ?? (i + 1);
+      const judul = b.judul ?? null;
+      const konten = b.konten ?? "";
+      const tipe = b.tipe ?? "lainnya";
+
+      if (b.id && currentIds.includes(b.id)) {
+        // Update
+        const { error: updErr } = await db
+          .from("artikel_bagian")
+          .update({
+            judul,
+            konten,
+            tipe,
+            urutan,
+            diperbarui_pada: new Date().toISOString(),
+          })
+          .eq("id", b.id);
+        if (updErr) throw updErr;
+        updatedIds.push(b.id);
+      } else {
+        // Insert
+        const { data: insData, error: insErr } = await db
+          .from("artikel_bagian")
+          .insert({
+            id_artikel: idArtikel,
+            judul,
+            konten,
+            tipe,
+            urutan,
+            diperbarui_pada: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        if (insErr) throw insErr;
+        if (insData) updatedIds.push(insData.id);
+      }
+    }
+
+    // Hapus bagian yang tidak ada dalam daftar yang dikirim
+    const toDeleteIds = currentIds.filter((id) => !updatedIds.includes(id));
+    if (toDeleteIds.length > 0) {
+      const { error: delErr } = await db
+        .from("artikel_bagian")
+        .delete()
+        .in("id", toDeleteIds);
+      if (delErr) throw delErr;
+    }
+
+    // Ambil kembali hasil akhir
+    const { data: finalData, error: finalErr } = await db
+      .from("artikel_bagian")
+      .select("id, id_artikel, tipe, judul, konten, urutan, dibuat_pada, diperbarui_pada")
+      .eq("id_artikel", idArtikel)
+      .order("urutan", { ascending: true });
+    if (finalErr) throw finalErr;
+
+    res.json({ bagian: finalData ?? [] });
   }),
 );
 

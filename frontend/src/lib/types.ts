@@ -100,3 +100,25 @@ export interface LoginPayload {
   identifier: string;
   password: string;
 }
+
+export interface ArtikelBagian {
+  id?: number;
+  id_artikel?: number;
+  tipe?: string;
+  judul: string | null;
+  konten: string;
+  urutan?: number;
+  dibuat_pada?: string;
+  diperbarui_pada?: string;
+}
+
+export interface PenyakitFormPayload {
+  nama: string;
+  slug: string;
+  ringkasan: string | null;
+  thumbnail: string | null;
+  tingkat_urgensi: UrgencyLevel;
+  id_sistem_tubuh: number;
+  code?: string | null;
+  bagian_tubuhIds: number[];
+}
