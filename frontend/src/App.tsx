@@ -97,7 +97,7 @@ export default function App() {
 {/* Detail penyakit */}
            <Route path="/penyakit/:id" element={<DiseaseDetailPage />} />
            {/* Admin route - protected for admin role only */}
-           <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminPage /></ProtectedRoute> /> }
+           <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminPage /></ProtectedRoute>} />
            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
