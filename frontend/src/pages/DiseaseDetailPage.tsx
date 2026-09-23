@@ -52,13 +52,11 @@ const CustomTableComponents = {
 };
 
 export function DiseaseDetailPage() {
-  const { id } = useParams();
-  const numericId = Number(id);
-  const validId =
-    Number.isInteger(numericId) && numericId > 0 ? numericId : null;
+  const { slug } = useParams();
+  const validSlug = slug && slug.trim() ? slug.trim() : null;
   const navigate = useNavigate();
 
-  const { data, isLoading, error } = useDiseaseDetail(validId);
+  const { data, isLoading, error } = useDiseaseDetail(validSlug);
 
   useEffect(() => {
     document.title = data ? `${data.nama} — Peta Kesehatan` : "Peta Kesehatan";

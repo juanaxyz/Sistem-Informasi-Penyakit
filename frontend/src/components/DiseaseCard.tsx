@@ -11,7 +11,7 @@ interface DiseaseCardProps {
 export function DiseaseCard({ disease }: DiseaseCardProps) {
   return (
     <Link
-      to={`/penyakit/${disease.id}`}
+      to={`/penyakit/${disease.slug}`}
       className="group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       aria-label={`Lihat detail ${disease.nama}`}
     >

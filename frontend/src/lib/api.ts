@@ -113,12 +113,16 @@ export const api = {
     getArtikelList: () => get<{ artikel: any[] }>("/api/artikel"),
     getArtikelBagian: (idArtikel: number) =>
       get<{ bagian: any[] }>(`/api/artikel/${idArtikel}/bagian`),
-    saveArtikelBagian: (idArtikel: number, bagian: any[]) =>
+saveArtikelBagian: (idArtikel: number, bagian: any[]) =>
       put<{ bagian: any[] }>(`/api/artikel/${idArtikel}/bagian`, { bagian }),
-    put: <T>(path: string, body: unknown) => put<T>(path, body),
+    getDiseaseDetailById: (id: number) =>
+      get<{ penyakit: DiseaseDetail }>(`/api/penyakit/${id}`),
+    getDiseaseDetailBySlug: (slug: string) =>
+      get<{ penyakit: DiseaseDetail }>(`/api/penyakit/slug/${slug}`),
+    put: <T>(path: string, body: unknown) => post<T>(path, body),
     chat: (payload: { question: string; session_id?: string; history?: ChatTurn[] }) =>
       post<ChatResult>("/api/rag/chat", payload),
-   auth: {
+    auth: {
      register: (payload: RegisterPayload) =>
        post<AuthResponse>("/api/auth/register", payload),
      login: (payload: LoginPayload) =>

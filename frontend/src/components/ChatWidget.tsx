@@ -19,11 +19,13 @@ const initialMessages: ChatMessage[] = [
   },
 ];
 
-/** Render teks jawaban, ubah tautan `/penyakit/{id}` menjadi link navigasi. */
+/** Render teks jawaban, ubah tautan `/penyakit/{id|slug}` menjadi link navigasi. */
 function renderAnswer(text: string) {
-  const parts = text.split(/(\/penyakit\/\d+)/g);
+  // Match /penyakit/ followed by word characters or hyphens (for both numeric IDs and slugs)
+  const parts = text.split(/(\/penyakit[\w-]+\/?)/g);
   return parts.map((part, i) => {
-    const m = part.match(/^\/penyakit\/(\d+)$/);
+    // Check if this part is a disease link (starts with /penyakit/ and contains word chars or hyphens)
+    const m = part.match(/^\/penyakit[\w-]+\/?$/);
     if (m) {
       return (
         <Link

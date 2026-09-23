@@ -2,14 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { DiseaseDetail } from "@/lib/types";
 
-export function useDiseaseDetail(diseaseId: number | null) {
+export function useDiseaseDetail(diseaseSlug: string | null) {
   return useQuery({
-    queryKey: ["penyakit", diseaseId],
+    queryKey: ["penyakit", "slug", diseaseSlug],
     queryFn: async () => {
-      const { penyakit } = await api.getDiseaseDetail(diseaseId!);
+      if (!diseaseSlug) return null;
+      const { penyakit } = await api.getDiseaseDetailBySlug(diseaseSlug);
       return penyakit;
     },
-    enabled: diseaseId !== null,
+    enabled: diseaseSlug !== null,
   });
 }
 

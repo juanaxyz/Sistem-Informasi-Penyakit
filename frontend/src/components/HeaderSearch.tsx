@@ -71,7 +71,7 @@ export function HeaderSearch() {
               {diseases.map((disease) => (
                 <li key={disease.id}>
                   <Link
-                    to={`/penyakit/${disease.id}`}
+                    to={`/penyakit/${disease.slug}`}
                     onClick={handleClear}
                     className="block px-3 py-2 rounded-md hover:bg-mint/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >

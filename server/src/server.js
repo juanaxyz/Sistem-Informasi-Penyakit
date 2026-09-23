@@ -588,23 +588,34 @@ app.get(
 
 // Detail lengkap satu penyakit: header, sistem_tubuh, artikel (dengan bagian-bagiannya),
 // bagian_tubuh (relasi many-to-many), referensi.
+// Param boleh numeric ID (kompatibilitas) atau slug publik.
 app.get(
-  "/api/penyakit/:idPenyakit",
+  "/api/penyakit/:idOrSlug",
   handle(async (req, res) => {
-    const idPenyakit = validateId(req.params.idPenyakit);
-    if (idPenyakit === null) {
-      return res.status(400).json({ error: "id penyakit tidak valid" });
+    const raw = String(req.params.idOrSlug ?? "").trim();
+    if (!raw) {
+      return res.status(400).json({ error: "id atau slug penyakit tidak valid" });
     }
 
-    const [diseaseRes, artikelRes, bagianRes, referensiRes] = await Promise.all(
+    const numericId = validateId(raw);
+    const diseaseQuery = db
+      .from("penyakit")
+      .select(
+        "id, id_sistem_tubuh, nama, slug, ringkasan, thumbnail, tingkat_urgensi, sistem_tubuh (id, nama)",
+      );
+    const diseaseRes = numericId
+      ? await diseaseQuery.eq("id", numericId).maybeSingle()
+      : await diseaseQuery.eq("slug", raw).maybeSingle();
+
+    if (diseaseRes.error) throw diseaseRes.error;
+    if (!diseaseRes.data) {
+      return res.status(404).json({ error: "penyakit tidak ditemukan" });
+    }
+
+    const idPenyakit = diseaseRes.data.id;
+
+    const [artikelRes, bagianRes, referensiRes] = await Promise.all(
       [
-        db
-          .from("penyakit")
-          .select(
-            "id, id_sistem_tubuh, nama, slug, ringkasan, thumbnail, tingkat_urgensi, sistem_tubuh (id, nama)",
-          )
-          .eq("id", idPenyakit)
-          .maybeSingle(),
         db
           .from("artikel")
           .select("id, status, ditinjau_pada, artikel_bagian(id, tipe, judul, urutan, konten)")
