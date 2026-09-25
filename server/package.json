@@ -2,20 +2,22 @@
   "name": "web-paru-paru-server",
   "version": "0.1.0",
   "private": true,
-  "description": "BFF (backend-for-frontend) untuk web_paru_paru — Express + Supabase. Menyajikan route /api untuk data penyakit, bagian tubuh, sistem tubuh, dan pencarian.",
+  "description": "BFF (backend-for-frontend) untuk web_paru_paru — Express + PostgreSQL. Menyajikan route /api untuk data penyakit, bagian tubuh, sistem tubuh, pencarian, autentikasi, dan riwayat analisis.",
   "scripts": {
     "dev": "nodemon --exec tsx src/server.js",
     "start": "tsx src/server.js",
-    "test": "jest --detectOpenHandles"
+    "test": "jest --detectOpenHandles",
+    "db:schema": "node scripts/apply-schema.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.112.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
-    "undici": "^8.10.2"
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

@@ -1,37 +1,30 @@
 const request = require("supertest");
+const jwt = require("jsonwebtoken");
 
-// 1. Mock Supabase sebelum server di-require
-const mockFrom = jest.fn();
-const mockRpc = jest.fn();
-jest.mock("@supabase/supabase-js", () => ({
-  createClient: () => ({
-    from: mockFrom,
-    rpc: mockRpc,
-  }),
+const mockQuery = jest.fn();
+
+jest.mock("./db/pg", () => ({
+  query: mockQuery,
+  pool: {},
 }));
 
-// 2. Mock global fetch untuk pengujian endpoint RAG Chat
 global.fetch = jest.fn();
 
-const app = require("./server");
+const app = require("./app");
+const config = require("./config");
 
-// Helper untuk membuat chaining mock Supabase Query Builder
-const createQueryBuilder = (result) => {
-  const builder = {
-    select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    order: jest.fn().mockReturnThis(),
-    ilike: jest.fn().mockReturnThis(),
-    maybeSingle: jest.fn().mockResolvedValue(result),
-    // Menangani kueri async yang langsung di-await tanpa method akhiran
-    then: (resolve) => resolve(result),
-  };
-  return builder;
-};
+const signToken = (overrides = {}) =>
+  jwt.sign(
+    { id: 1, email: "user@example.com", username: "user1", role: "user", ...overrides },
+    config.jwt.secret,
+    { expiresIn: "1h" },
+  );
+
+const ok = (rows) => ({ rows: rows ?? [], rowCount: rows?.length ?? 0 });
 
 describe("API Test Suite", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   // --- HEALTH CHECK ---
@@ -43,23 +36,39 @@ describe("API Test Suite", () => {
     });
   });
 
+  describe("GET /health", () => {
+    it("harus mengembalikan status OK", async () => {
+      const res = await request(app).get("/health");
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty("status", "OK");
+    });
+  });
+
+  // --- 404 HANDLER ---
+  describe("GET /api/tidak-ada", () => {
+    it("harus 404 untuk route yang tidak dikenal", async () => {
+      const res = await request(app).get("/api/tidak-ada");
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe("Route not found");
+    });
+  });
+
   // --- BAGIAN TUBUH ---
   describe("GET /api/bagian-tubuh", () => {
     it("harus mengembalikan daftar bagian tubuh", async () => {
-      const mockData = [{ id: 1, nama: "Kepala", tampilan: "front" }];
-      mockFrom.mockReturnValue(
-        createQueryBuilder({ data: mockData, error: null }),
+      mockQuery.mockResolvedValueOnce(
+        ok([{ id: 1, nama: "Kepala", tampilan: "depan" }]),
       );
 
       const res = await request(app).get("/api/bagian-tubuh");
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ bagian_tubuh: mockData });
+      expect(res.body).toEqual({
+        bagian_tubuh: [{ id: 1, nama: "Kepala", tampilan: "depan" }],
+      });
     });
 
-    it("harus mengembalikan 500 jika Supabase mengalami error", async () => {
-      mockFrom.mockReturnValue(
-        createQueryBuilder({ data: null, error: new Error("Database error") }),
-      );
+    it("harus mengembalikan 500 jika query gagal", async () => {
+      mockQuery.mockRejectedValueOnce(new Error("Database error"));
 
       const res = await request(app).get("/api/bagian-tubuh");
       expect(res.status).toBe(500);
@@ -75,13 +84,9 @@ describe("API Test Suite", () => {
       expect(res.body).toEqual({ error: "id bagian tubuh tidak valid" });
     });
 
-    it("harus menghitung `jumlah_penyakit` dan me-deduplikasi sistem tubuh", async () => {
-      const mockRawData = [
-        { penyakit: { sistem_tubuh: { id: 10, nama: "Saraf" } } },
-        { penyakit: { sistem_tubuh: { id: 10, nama: "Saraf" } } }, // Duplikat sistem
-      ];
-      mockFrom.mockReturnValue(
-        createQueryBuilder({ data: mockRawData, error: null }),
+    it("harus menghitung `jumlah_penyakit` per sistem tubuh", async () => {
+      mockQuery.mockResolvedValueOnce(
+        ok([{ id: 10, nama: "Saraf", jumlah_penyakit: 2 }]),
       );
 
       const res = await request(app).get("/api/sistem-tubuh/byBody/1");
@@ -101,14 +106,35 @@ describe("API Test Suite", () => {
     });
 
     it("harus mengembalikan daftar penyakit sesuai filter", async () => {
-      const mockPenyakit = [{ id: 1, nama: "Migrain" }];
-      mockFrom.mockReturnValue(
-        createQueryBuilder({ data: mockPenyakit, error: null }),
+      mockQuery.mockResolvedValueOnce(
+        ok([
+          {
+            id: 1,
+            nama: "Migrain",
+            slug: "migrain",
+            ringkasan: null,
+            thumbnail: null,
+            tingkat_urgensi: "normal",
+            id_bagian_tubuh: 2,
+          },
+        ]),
       );
 
       const res = await request(app).get("/api/penyakit/bySystemAndBody/1/2");
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ penyakit: mockPenyakit });
+      expect(res.body).toEqual({
+        penyakit: [
+          {
+            id: 1,
+            nama: "Migrain",
+            slug: "migrain",
+            ringkasan: null,
+            thumbnail: null,
+            tingkat_urgensi: "normal",
+            penyakit_bagian_tubuh: [{ id_bagian_tubuh: 2 }],
+          },
+        ],
+      });
     });
   });
 
@@ -120,26 +146,23 @@ describe("API Test Suite", () => {
       expect(res.body).toEqual({ penyakit: [] });
     });
 
-    it("harus meng-escape karakter khusus dan me-deduplikasi hasil pencarian", async () => {
-      const mockDataNama = [{ id: 1, nama: "Flu" }];
-      const mockDataRingkasan = [
-        { id: 1, nama: "Flu" },
-        { id: 2, nama: "Batuk" },
-      ];
-
-      mockFrom
-        .mockReturnValueOnce(
-          createQueryBuilder({ data: mockDataNama, error: null }),
-        )
-        .mockReturnValueOnce(
-          createQueryBuilder({ data: mockDataRingkasan, error: null }),
-        );
+    it("harus meng-escape karakter wildcard dan mengurutkan hasil", async () => {
+      mockQuery.mockResolvedValueOnce(
+        ok([
+          { id: 2, nama: "Batuk" },
+          { id: 1, nama: "Flu" },
+        ]),
+      );
 
       const res = await request(app).get("/api/penyakit/cari?q=Fl*u%");
       expect(res.status).toBe(200);
       expect(res.body.penyakit.length).toBe(2);
-      expect(res.body.penyakit[0].nama).toBe("Batuk"); // Terurut secara alfabetis
+      expect(res.body.penyakit[0].nama).toBe("Batuk");
       expect(res.body.penyakit[1].nama).toBe("Flu");
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining("ILIKE $1"),
+        ["%Fl\\*u\\%%"],
+      );
     });
   });
 
@@ -152,25 +175,20 @@ describe("API Test Suite", () => {
     });
 
     it("harus mengembalikan artikel konten penyakit", async () => {
-      const mockArtikel = [{ id: 100, konten: "Penjelasan penyakit..." }];
-      mockFrom.mockReturnValue(
-        createQueryBuilder({ data: mockArtikel, error: null }),
+      mockQuery.mockResolvedValueOnce(
+        ok([{ id: 100, konten: "Penjelasan penyakit..." }]),
       );
 
       const res = await request(app).get("/api/penyakit/1/konten");
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ konten: mockArtikel });
+      expect(res.body).toEqual({ konten: [{ id: 100, konten: "Penjelasan penyakit..." }] });
     });
   });
 
   // --- DETAIL LENGKAP PENYAKIT ---
-  describe("GET /api/penyakit/:idPenyakit", () => {
+  describe("GET /api/penyakit/:idOrSlug", () => {
     it("harus 404 jika detail penyakit tidak ditemukan", async () => {
-      mockFrom
-        .mockReturnValueOnce(createQueryBuilder({ data: null, error: null })) // diseaseRes
-        .mockReturnValueOnce(createQueryBuilder({ data: [], error: null })) // artikelRes
-        .mockReturnValueOnce(createQueryBuilder({ data: [], error: null })) // bagianRes
-        .mockReturnValueOnce(createQueryBuilder({ data: [], error: null })); // referensiRes
+      mockQuery.mockResolvedValueOnce(ok([]));
 
       const res = await request(app).get("/api/penyakit/999");
       expect(res.status).toBe(404);
@@ -178,33 +196,72 @@ describe("API Test Suite", () => {
     });
 
     it("harus menggabungkan data penyakit, artikel, bagian tubuh, dan referensi", async () => {
-      const diseaseData = { id: 1, nama: "Maag" };
-      const artikelData = [{ id: 10, konten: "Konten Maag" }];
-      const bagianData = [{ bagian_tubuh: { id: 5, nama: "Lambung" } }];
-      const refData = [{ id: 1, url: "https://example.com" }];
-
-      mockFrom
-        .mockReturnValueOnce(
-          createQueryBuilder({ data: diseaseData, error: null }),
-        )
-        .mockReturnValueOnce(
-          createQueryBuilder({ data: artikelData, error: null }),
-        )
-        .mockReturnValueOnce(
-          createQueryBuilder({ data: bagianData, error: null }),
-        )
-        .mockReturnValueOnce(
-          createQueryBuilder({ data: refData, error: null }),
-        );
+      mockQuery
+        .mockResolvedValueOnce(
+          ok([
+            {
+              id: 1,
+              id_sistem_tubuh: 2,
+              nama: "Maag",
+              slug: "maag",
+              ringkasan: null,
+              thumbnail: null,
+              tingkat_urgensi: "normal",
+              sistem_id: 2,
+              sistem_nama: "Pencernaan",
+            },
+          ]),
+        ) // disease
+        .mockResolvedValueOnce(
+          ok([
+            {
+              id: 10,
+              status: "published",
+              ditinjau_pada: null,
+              bagian_id: 1,
+              tipe: "konten",
+              judul: "Pengertian",
+              urutan: 1,
+              konten: "Konten Maag",
+            },
+          ]),
+        ) // artikel
+        .mockResolvedValueOnce(
+          ok([{ id: 5, nama: "Lambung", tampilan: "depan" }]),
+        ) // bagian_tubuh
+        .mockResolvedValueOnce(ok([{ id: 1, url: "https://example.com" }])); // referensi
 
       const res = await request(app).get("/api/penyakit/1");
       expect(res.status).toBe(200);
       expect(res.body.penyakit).toEqual({
-        ...diseaseData,
-        artikel: artikelData,
-        bagian_tubuh: [{ id: 5, nama: "Lambung" }],
-        referensi: refData,
+        id: 1,
+        id_sistem_tubuh: 2,
+        nama: "Maag",
+        slug: "maag",
+        ringkasan: null,
+        thumbnail: null,
+        tingkat_urgensi: "normal",
+        sistem_tubuh: { id: 2, nama: "Pencernaan" },
+        artikel: [
+          {
+            id: 10,
+            status: "published",
+            ditinjau_pada: null,
+            bagian: [
+              { id: 1, tipe: "konten", judul: "Pengertian", urutan: 1, konten: "Konten Maag" },
+            ],
+          },
+        ],
+        bagian_tubuh: [{ id: 5, nama: "Lambung", tampilan: "depan" }],
+        referensi: [{ id: 1, url: "https://example.com" }],
       });
+    });
+
+    it("harus 404 jika slug tidak dikenal (query tidak mengembalikan baris)", async () => {
+      mockQuery.mockResolvedValueOnce(ok([]));
+      const res = await request(app).get("/api/penyakit/slug/tidak-ada");
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: "penyakit tidak ditemukan" });
     });
   });
 
@@ -278,9 +335,9 @@ describe("API Test Suite", () => {
           email: "budi@example.com",
           username: "budi123",
           role: "user",
-          dibuat_pada: "2026-09-13T00:00:00Z",
+          dibuat_pada: "2026-09-13T00:00:00.000Z",
         };
-        mockRpc.mockResolvedValueOnce({ data: [mockUser], error: null });
+        mockQuery.mockResolvedValueOnce(ok([mockUser]));
 
         const res = await request(app)
           .post("/api/auth/register")
@@ -295,6 +352,25 @@ describe("API Test Suite", () => {
         expect(res.body).toHaveProperty("token");
         expect(res.body.user).toEqual(mockUser);
       });
+
+      it("harus 409 jika email/username sudah terdaftar", async () => {
+        mockQuery.mockRejectedValueOnce({
+          code: "23505",
+          message: 'duplicate key value violates unique constraint "users_email_key"',
+        });
+
+        const res = await request(app)
+          .post("/api/auth/register")
+          .send({
+            nama: "Budi",
+            email: "budi@example.com",
+            username: "budi123",
+            password: "password123",
+          });
+
+        expect(res.status).toBe(409);
+        expect(res.body).toEqual({ error: "Email atau username sudah terdaftar" });
+      });
     });
 
     describe("POST /api/auth/login", () => {
@@ -306,7 +382,7 @@ describe("API Test Suite", () => {
       });
 
       it("harus 401 jika user tidak ditemukan", async () => {
-        mockRpc.mockResolvedValueOnce({ data: [], error: null });
+        mockQuery.mockResolvedValueOnce(ok([]));
         const res = await request(app)
           .post("/api/auth/login")
           .send({ identifier: "unknown@example.com", password: "password123" });
@@ -328,6 +404,112 @@ describe("API Test Suite", () => {
         const res = await request(app).get("/api/auth/me");
         expect(res.status).toBe(401);
       });
+
+      it("harus 200 dengan profil user jika token valid", async () => {
+        mockQuery.mockResolvedValueOnce(
+          ok([{ id: 1, nama: "Budi", email: "budi@example.com", username: "budi123", role: "user" }]),
+        );
+        const res = await request(app)
+          .get("/api/auth/me")
+          .set("Authorization", `Bearer ${signToken()}`);
+        expect(res.status).toBe(200);
+        expect(res.body.user).toHaveProperty("nama", "Budi");
+      });
+
+      it("harus 403 jika token tidak valid", async () => {
+        const res = await request(app)
+          .get("/api/auth/me")
+          .set("Authorization", "Bearer token-palsu");
+        expect(res.status).toBe(403);
+      });
+    });
+  });
+
+  // --- AUTH PROTECTION PADA ROUTE TERPROTEKSI ---
+  describe("Proteksi route (verifyToken & requireRole)", () => {
+    it("harus 401 pada GET /api/riwayat tanpa token", async () => {
+      const res = await request(app).get("/api/riwayat");
+      expect(res.status).toBe(401);
+    });
+
+    it("harus 401 pada GET /api/penyakit (admin) tanpa token", async () => {
+      const res = await request(app).get("/api/penyakit");
+      expect(res.status).toBe(401);
+    });
+
+    it("harus 403 pada GET /api/penyakit (admin) dengan token role user", async () => {
+      const res = await request(app)
+        .get("/api/penyakit")
+        .set("Authorization", `Bearer ${signToken({ role: "user" })}`);
+      expect(res.status).toBe(403);
+    });
+
+    it("harus 200 pada GET /api/penyakit (admin) dengan token role admin", async () => {
+      mockQuery.mockResolvedValueOnce(
+        ok([
+          {
+            id: 1,
+            nama: "Maag",
+            slug: "maag",
+            ringkasan: null,
+            thumbnail: null,
+            tingkat_urgensi: "normal",
+            id_sistem_tubuh: 2,
+            sistem_nama: "Pencernaan",
+          },
+        ]),
+      );
+      const res = await request(app)
+        .get("/api/penyakit")
+        .set("Authorization", `Bearer ${signToken({ role: "admin" })}`);
+      expect(res.status).toBe(200);
+      expect(res.body.penyakit[0]).toHaveProperty("sistem_tubuh_nama", "Pencernaan");
+    });
+
+    it("harus 200 pada GET /api/sistem-tubuh (admin) dengan token admin", async () => {
+      mockQuery.mockResolvedValueOnce(ok([{ id: 1, nama: "Saraf" }]));
+      const res = await request(app)
+        .get("/api/sistem-tubuh")
+        .set("Authorization", `Bearer ${signToken({ role: "admin" })}`);
+      expect(res.status).toBe(200);
+      expect(res.body.sistem_tubuh).toEqual([{ id: 1, nama: "Saraf" }]);
+    });
+  });
+
+  // --- RIWAYAT (terproteksi) ---
+  describe("Route riwayat", () => {
+    it("GET /api/riwayat mengembalikan daftar riwayat user", async () => {
+      mockQuery.mockResolvedValueOnce(
+        ok([{ id: 5, user_id: 1, gambar: "url", status: "completed" }]),
+      );
+      const res = await request(app)
+        .get("/api/riwayat?limit=10&offset=0")
+        .set("Authorization", `Bearer ${signToken()}`);
+      expect(res.status).toBe(200);
+      expect(res.body.riwayat).toHaveLength(1);
+    });
+
+    it("POST /api/riwayat membuat riwayat baru", async () => {
+      mockQuery.mockResolvedValueOnce(ok([{ id: 6, status: "processing" }]));
+      const res = await request(app)
+        .post("/api/riwayat")
+        .set("Authorization", `Bearer ${signToken()}`)
+        .send({ gambar: "data:image/png;base64,xxxx" });
+      expect(res.status).toBe(201);
+      expect(res.body).toEqual({ id: 6, status: "processing" });
+    });
+  });
+
+  // --- ROUTE DUPLIKAT TANPA PREFIX SUDAH DIHAPUS ---
+  describe("Route tanpa prefix /api", () => {
+    it("harus 404 pada /auth/register (prefix tidak lagi dilayani di path root)", async () => {
+      const res = await request(app).post("/auth/register");
+      expect(res.status).toBe(404);
+    });
+
+    it("harus 404 pada /riwayat", async () => {
+      const res = await request(app).get("/riwayat");
+      expect(res.status).toBe(404);
     });
   });
 });
