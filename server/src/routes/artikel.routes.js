@@ -3,6 +3,7 @@ const asyncHandler = require("../middlewares/async-handler");
 const { authMiddleware, requireRole } = require("../middlewares/auth");
 const {
   handleGetArtikelList,
+  handleCreateArtikel,
   handleUpdateArtikel,
   handleGetArtikelBagian,
   handleSaveArtikelBagian,
@@ -11,6 +12,7 @@ const {
 const router = express.Router();
 
 router.get("/artikel", authMiddleware, requireRole("admin"), asyncHandler(handleGetArtikelList));
+router.post("/artikel", authMiddleware, requireRole("admin"), asyncHandler(handleCreateArtikel));
 router.put(
   "/artikel/:idArtikel",
   authMiddleware,

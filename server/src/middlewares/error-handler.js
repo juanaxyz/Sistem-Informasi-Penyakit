@@ -17,7 +17,16 @@ const errorHandler = (err, req, res, next) => {
   }
 
   if (isUniqueViolationError(err)) {
-    return res.status(409).json({ error: "Email atau username sudah terdaftar" });
+    const constraint = String(err?.constraint || "");
+    const isUserConflict =
+      constraint === "" || /^users_(email|username)_key$/.test(constraint);
+    if (isUserConflict || config.isProd) {
+      return res.status(409).json({ error: "Email atau username sudah terdaftar" });
+    }
+    return res.status(409).json({
+      error: "Data sudah digunakan",
+      details: { constraint: constraint || undefined },
+    });
   }
 
   if (err instanceof AppError) {

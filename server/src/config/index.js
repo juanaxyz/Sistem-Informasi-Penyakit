@@ -1,4 +1,5 @@
 require("dotenv").config();
+const path = require("path");
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -34,6 +35,9 @@ module.exports = {
       : true,
   },
   ragApiUrl: process.env.RAG_API_URL || "http://localhost:8000",
+  // Analisis citra dimuat di service Python yang sama (default ikut RAG_API_URL).
+  modelApiUrl: process.env.MODEL_API_URL || process.env.RAG_API_URL || "http://localhost:8000",
+  uploadsDir: path.resolve(__dirname, "..", "..", "uploads"),
   jwt: {
     secret: process.env.JWT_SECRET || (isProd ? "" : "dev_secret_only"),
     expiresIn: "7d",

@@ -34,7 +34,7 @@ const handleRegister = async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const { rows, error } = await query(
+  const { rows } = await query(
     `INSERT INTO users (nama, email, username, password, role)
      VALUES ($1, $2, $3, $4, 'user')
      RETURNING id, nama, email, username, role, dibuat_pada`,
@@ -118,6 +118,60 @@ const handleLogin = async (req, res) => {
   });
 };
 
+const handleUpdateMe = async (req, res) => {
+  const { rows: userRows } = await query(
+    `SELECT id, nama, email, username, role, password
+     FROM users
+     WHERE id = $1
+     LIMIT 1`,
+    [req.user.id],
+  );
+
+  const current = userRows[0];
+  if (!current) {
+    throw new AppError("User tidak ditemukan", 404);
+  }
+
+  const payload = {
+    nama: String(req.body?.nama ?? current.nama).trim(),
+    email: String(req.body?.email ?? current.email).trim().toLowerCase(),
+    username: String(req.body?.username ?? current.username).trim(),
+    password: String(req.body?.password ?? ""),
+  };
+
+  if (!payload.nama || !payload.email || !payload.username) {
+    throw new AppError("nama, email, dan username wajib diisi", 400);
+  }
+  if (!EMAIL_REGEX.test(payload.email)) {
+    throw new AppError("Format email tidak valid", 400);
+  }
+  if (payload.username.length < 3) {
+    throw new AppError("Username minimal 3 karakter", 400);
+  }
+  if (payload.password && payload.password.length < 6) {
+    throw new AppError("Password minimal 6 karakter", 400);
+  }
+
+  const passwordHash = payload.password
+    ? await bcrypt.hash(payload.password, 10)
+    : current.password;
+
+  const { rows } = await query(
+    `UPDATE users
+     SET nama = $1, email = $2, username = $3, password = $4
+     WHERE id = $5
+     RETURNING id, nama, email, username, role, dibuat_pada`,
+    [payload.nama, payload.email, payload.username, passwordHash, req.user.id],
+  ).catch((err) => {
+    if (isUniqueViolationError(err)) {
+      throw new AppError("Email atau username sudah terdaftar", 409);
+    }
+    throw err;
+  });
+
+  res.json({ user: rows[0] });
+};
+
 const handleGetMe = async (req, res) => {
   const { rows } = await query(
     `SELECT id, nama, email, username, role, dibuat_pada
@@ -143,5 +197,6 @@ module.exports = {
   handleRegister,
   handleLogin,
   handleGetMe,
+  handleUpdateMe,
   handleLogout,
 };

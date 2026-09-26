@@ -5,6 +5,7 @@ const {
   handleRegister,
   handleLogin,
   handleGetMe,
+  handleUpdateMe,
   handleLogout,
 } = require("../controllers/auth.controller");
 
@@ -14,5 +15,6 @@ router.post("/auth/register", asyncHandler(handleRegister));
 router.post("/auth/login", asyncHandler(handleLogin));
 router.post("/auth/logout", asyncHandler(handleLogout));
 router.get("/auth/me", authMiddleware, asyncHandler(handleGetMe));
+router.put("/auth/me", authMiddleware, asyncHandler(handleUpdateMe));
 
 module.exports = router;

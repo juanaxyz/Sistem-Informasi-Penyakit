@@ -97,6 +97,44 @@ describe("API Test Suite", () => {
     });
   });
 
+  // --- JENIS ANALISIS BY BODY ID ---
+  describe("GET /api/jenis-analisis/byBody/:idBody", () => {
+    it("harus mengembalikan status 400 jika idBody tidak valid", async () => {
+      const res = await request(app).get("/api/jenis-analisis/byBody/abc");
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "id bagian tubuh tidak valid" });
+    });
+
+    it("harus mengembalikan jenis analisis aktif untuk bagian tubuh", async () => {
+      mockQuery.mockResolvedValueOnce(
+        ok([
+          {
+            id: 1,
+            nama: "Klasifikasi Penyakit Paru",
+            slug: "klasifikasi-penyakit-paru",
+            deskripsi: "Analisis citra X-ray pada bagian dada.",
+            tipe_input: "xray",
+            icon: "scan-line",
+          },
+        ]),
+      );
+
+      const res = await request(app).get("/api/jenis-analisis/byBody/1");
+      expect(res.status).toBe(200);
+      expect(res.body.jenis_analisis).toEqual([
+        expect.objectContaining({ id: 1, slug: "klasifikasi-penyakit-paru" }),
+      ]);
+    });
+
+    it("harus mengembalikan array kosong jika bagian tidak punya analisis", async () => {
+      mockQuery.mockResolvedValueOnce(ok([]));
+
+      const res = await request(app).get("/api/jenis-analisis/byBody/20");
+      expect(res.status).toBe(200);
+      expect(res.body.jenis_analisis).toEqual([]);
+    });
+  });
+
   // --- PENYAKIT BY SYSTEM AND BODY ---
   describe("GET /api/penyakit/bySystemAndBody/:idBody/:idSystem", () => {
     it("harus 400 jika salah satu ID tidak valid", async () => {
@@ -229,7 +267,10 @@ describe("API Test Suite", () => {
         .mockResolvedValueOnce(
           ok([{ id: 5, nama: "Lambung", tampilan: "depan" }]),
         ) // bagian_tubuh
-        .mockResolvedValueOnce(ok([{ id: 1, url: "https://example.com" }])); // referensi
+        .mockResolvedValueOnce(ok([{ id: 1, url: "https://example.com" }])) // referensi
+        .mockResolvedValueOnce(
+          ok([{ id: 7, nama: "Helicobacter pylori", jenis: "bakteri" }]),
+        ); // patogen
 
       const res = await request(app).get("/api/penyakit/1");
       expect(res.status).toBe(200);
@@ -254,6 +295,7 @@ describe("API Test Suite", () => {
         ],
         bagian_tubuh: [{ id: 5, nama: "Lambung", tampilan: "depan" }],
         referensi: [{ id: 1, url: "https://example.com" }],
+        patogen: [{ id: 7, nama: "Helicobacter pylori", jenis: "bakteri" }],
       });
     });
 
@@ -494,7 +536,7 @@ describe("API Test Suite", () => {
       const res = await request(app)
         .post("/api/riwayat")
         .set("Authorization", `Bearer ${signToken()}`)
-        .send({ gambar: "data:image/png;base64,xxxx" });
+        .attach("gambar", Buffer.from("iVBORw0KGgoAAAANSUhEUg=="), "gambar.png");
       expect(res.status).toBe(201);
       expect(res.body).toEqual({ id: 6, status: "processing" });
     });

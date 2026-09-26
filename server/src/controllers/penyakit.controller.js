@@ -107,7 +107,7 @@ const handleGetPenyakitDetail = async (req, res) => {
 
   const idPenyakit = diseaseRow.id;
 
-  const [artikelRes, bagianRes, referensiRes] = await Promise.all([
+  const [artikelRes, bagianRes, referensiRes, patogenRes] = await Promise.all([
     query(
       `SELECT a.id, a.status, a.ditinjau_pada,
               ab.id AS bagian_id, ab.tipe, ab.judul, ab.urutan, ab.konten
@@ -127,6 +127,14 @@ const handleGetPenyakitDetail = async (req, res) => {
     ),
     query(
       `SELECT id, url FROM referensi WHERE id_penyakit = $1 ORDER BY id`,
+      [idPenyakit],
+    ),
+    query(
+      `SELECT pg.id, pg.nama, pg.jenis, pg.deskripsi
+       FROM penyakit_patogen pp
+       JOIN patogen pg ON pg.id = pp.id_patogen
+       WHERE pp.id_penyakit = $1
+       ORDER BY pg.nama`,
       [idPenyakit],
     ),
   ]);
@@ -161,6 +169,13 @@ const handleGetPenyakitDetail = async (req, res) => {
 
   const referensi = referensiRes.rows.map((r) => ({ id: r.id, url: r.url }));
 
+  const patogen = patogenRes.rows.map((r) => ({
+    id: r.id,
+    nama: r.nama,
+    jenis: r.jenis,
+    deskripsi: r.deskripsi,
+  }));
+
   const {
     sistem_id,
     sistem_nama,
@@ -174,6 +189,7 @@ const handleGetPenyakitDetail = async (req, res) => {
       artikel,
       bagian_tubuh,
       referensi,
+      patogen,
     },
   });
 };

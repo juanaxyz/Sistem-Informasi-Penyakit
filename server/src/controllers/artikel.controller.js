@@ -28,6 +28,44 @@ const handleGetArtikelList = async (_req, res) => {
   res.json({ artikel: artikelList });
 };
 
+const handleCreateArtikel = async (req, res) => {
+  const idPenyakit = validateId(req.body?.id_penyakit);
+  if (idPenyakit === null) throw new AppError("id penyakit tidak valid", 400);
+
+  const { rows: penyakitRows } = await query(
+    `SELECT id, nama FROM penyakit WHERE id = $1 LIMIT 1`,
+    [idPenyakit],
+  );
+  const penyakit = penyakitRows[0];
+  if (!penyakit) throw new AppError("Penyakit tidak ditemukan", 404);
+
+  const { rows: existing } = await query(
+    `SELECT id FROM artikel WHERE id_penyakit = $1 LIMIT 1`,
+    [idPenyakit],
+  );
+  if (existing[0]) {
+    throw new AppError("Penyakit ini sudah memiliki artikel", 409);
+  }
+
+  const { rows } = await query(
+    `INSERT INTO artikel (id_penyakit, status)
+     VALUES ($1, 'draft')
+     RETURNING id, id_penyakit, status, dibuat_pada`,
+    [idPenyakit],
+  );
+  const artikel = rows[0];
+
+  res.status(201).json({
+    artikel: {
+      id: artikel.id,
+      id_penyakit: artikel.id_penyakit,
+      judul: "",
+      konten: "",
+      penyakit_nama: penyakit.nama,
+    },
+  });
+};
+
 const handleUpdateArtikel = async (req, res) => {
   const idArtikel = validateId(req.params.idArtikel);
   if (idArtikel === null) throw new AppError("id artikel tidak valid", 400);
@@ -145,6 +183,7 @@ const handleSaveArtikelBagian = async (req, res) => {
 
 module.exports = {
   handleGetArtikelList,
+  handleCreateArtikel,
   handleUpdateArtikel,
   handleGetArtikelBagian,
   handleSaveArtikelBagian,

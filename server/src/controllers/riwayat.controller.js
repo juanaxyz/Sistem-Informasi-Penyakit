@@ -1,12 +1,85 @@
+const fs = require("fs");
+const path = require("path");
 const { query } = require("../db/pg");
+const { validateId } = require("../utils/validators");
 const AppError = require("../utils/AppError");
+const config = require("../config");
+
+const clampConfidence = (value) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 0;
+  return Math.round(Math.min(1, Math.max(0, num)) * 10000) / 10000;
+};
+
+// Alias label model (Inggris/umum) -> nama penyakit di basis data. Nama
+// penyakit yang sudah sama tidak perlu didaftarkan di sini.
+const PENYAKIT_ALIASES = {
+  tb: "Tuberkulosis",
+  tbc: "Tuberkulosis",
+  tuberculosis: "Tuberkulosis",
+  covid: "COVID-19",
+  covid19: "COVID-19",
+  "covid-19": "COVID-19",
+  mass: "Massa Paru",
+  masse: "Massa Paru",
+  nodule: "Nodul Paru",
+  pneumonia: "Pneumonia",
+  "lung opacity": "Lung Opacity",
+  opacity: "Lung Opacity",
+};
+
+// Pastikan baris model ada di tabel `model` (auto-sync dari respons model API).
+const ensureModelId = async (namaModel, versi) => {
+  const model = String(namaModel ?? "").trim();
+  const versiModel = String(versi ?? "").trim();
+  if (!model) return null;
+
+  const { rows: existing } = await query(
+    `SELECT id FROM model
+     WHERE LOWER(nama_model) = LOWER($1) AND LOWER(versi) = LOWER($2)
+     LIMIT 1`,
+    [model, versiModel],
+  );
+  if (existing[0]) return existing[0].id;
+
+  const { rows: inserted } = await query(
+    `INSERT INTO model (nama_model, versi, is_active)
+     VALUES ($1, $2, TRUE)
+     RETURNING id`,
+    [model, versiModel],
+  );
+  if (!inserted[0]) throw new AppError("Gagal menyimpan model", 500);
+  return inserted[0].id;
+};
+
+// Petakan label hasil model ke `penyakit`. Mengembalikan null bila tidak ada
+// kecocokan (mis. label "Normal" yang memang bukan penyakit).
+const resolvePenyakitId = async (label) => {
+  const match = String(label ?? "").trim();
+  if (!match) return null;
+  const candidate = PENYAKIT_ALIASES[match.toLowerCase()] || match;
+  const { rows } = await query(
+    `SELECT id FROM penyakit
+     WHERE LOWER(code) = LOWER($1) OR LOWER(nama) = LOWER($2)
+     LIMIT 1`,
+    [match, candidate],
+  );
+  return rows[0]?.id ?? null;
+};
+
+const getRiwayatFile = (riwayat) => {
+  const fileName = path.basename(riwayat.gambar);
+  const filePath = path.join(config.uploadsDir, fileName);
+  if (!fs.existsSync(filePath)) return null;
+  return { filePath, name: fileName };
+};
 
 const handleCreateRiwayat = async (req, res) => {
   const { user } = req;
   if (!user) throw new AppError("Authentication required", 401);
-  const gambar = String(req.body?.gambar ?? "").trim();
-  if (!gambar) throw new AppError("gambar wajib diisi", 400);
+  if (!req.file) throw new AppError("gambar wajib diisi (form-data, field 'gambar')", 400);
 
+  const gambar = `/uploads/${req.file.filename}`;
   const { rows } = await query(
     `INSERT INTO riwayat (user_id, gambar, status)
      VALUES ($1, $2, 'processing')
@@ -38,8 +111,8 @@ const handleGetRiwayat = async (req, res) => {
 const handleGetRiwayatDetail = async (req, res) => {
   const { user } = req;
   if (!user) throw new AppError("Authentication required", 401);
-  const id = parseInt(req.params.id);
-  if (isNaN(id)) throw new AppError("ID riwayat tidak valid", 400);
+  const id = validateId(req.params.id);
+  if (id === null) throw new AppError("ID riwayat tidak valid", 400);
 
   const { rows } = await query(
     `SELECT id, user_id, gambar, status, dibuat_pada, diperbarui_pada
@@ -53,14 +126,29 @@ const handleGetRiwayatDetail = async (req, res) => {
   if (riwayat.user_id !== user.id && user.role !== "admin") {
     throw new AppError("Tidak diizinkan mengakses riwayat ini", 403);
   }
-  res.json({ riwayat });
+
+  const { rows: predictionRows } = await query(
+    `SELECT pr.id,
+            m.nama_model AS model,
+            m.versi AS versi,
+            p.nama AS penyakit,
+            p.code AS kode,
+            pr.confidence::float8 AS confidence
+     FROM prediksi pr
+     JOIN model m ON m.id = pr.model_id
+     JOIN penyakit p ON p.id = pr.id_penyakit
+     WHERE pr.riwayat_id = $1
+     ORDER BY pr.id`,
+    [id],
+  );
+  res.json({ riwayat: { ...riwayat, predictions: predictionRows } });
 };
 
 const handleRunAnalisis = async (req, res) => {
   const { user } = req;
   if (!user) throw new AppError("Authentication required", 401);
-  const id = parseInt(req.params.id);
-  if (isNaN(id)) throw new AppError("ID riwayat tidak valid", 400);
+  const id = validateId(req.params.id);
+  if (id === null) throw new AppError("ID riwayat tidak valid", 400);
 
   const { rows: riwayatRows } = await query(
     `SELECT id, user_id, gambar, status FROM riwayat WHERE id = $1 LIMIT 1`,
@@ -75,59 +163,43 @@ const handleRunAnalisis = async (req, res) => {
     throw new AppError("Riwayat belum dalam status processing", 400);
   }
 
-  const { rows: modelRows } = await query(
-    `SELECT id, nama_model, versi FROM model WHERE is_active = TRUE ORDER BY id`,
-  );
-  const models = modelRows;
-  if (models.length === 0) {
-    throw new AppError("Tidak ada model aktif", 500);
-  }
+  const file = getRiwayatFile(riwayat);
+  if (!file) throw new AppError("File gambar riwayat tidak ditemukan", 400);
+  const bytes = fs.readFileSync(file.filePath);
 
-  const { rows: penyakitRows } = await query(
-    `SELECT id, code, nama FROM penyakit ORDER BY code`,
-  );
-  const penyakitList = penyakitRows;
-  if (penyakitList.length === 0) {
-    throw new AppError("Tidak ada penyakit yang tersedia", 500);
-  }
+  const form = new FormData();
+  form.append("image", new Blob([bytes], { type: "application/octet-stream" }), file.name);
 
-  // Simulasi deterministik: hash gambar -> indeks penyakit + confidence.
-  const hashString = (str) => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash;
-    }
-    return hash;
-  };
-  const seed = hashString(riwayat.gambar);
-  const predictions = [];
-  for (let i = 0; i < models.length; i++) {
-    const model = models[i];
-    const penyakitIndex =
-      (((seed + i) % penyakitList.length) + penyakitList.length) %
-      penyakitList.length;
-    const penyakit = penyakitList[penyakitIndex];
-    const confidence = Number(
-      (0.7 + ((Math.abs(seed + i) % 1000) / 1000) * 0.29).toFixed(4),
-    );
-    const { rows } = await query(
-      `INSERT INTO prediksi (riwayat_id, model_id, id_penyakit, confidence)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, confidence`,
-      [id, model.id, penyakit.id, confidence],
-    );
-    const prediksi = rows[0];
-    if (!prediksi) throw new AppError("Gagal membuat prediksi", 500);
-    predictions.push({
-      id: prediksi.id,
-      model: model.nama_model,
-      versi: model.versi,
-      penyakit: penyakit.nama,
-      kode: penyakit.code,
-      confidence: prediksi.confidence,
+  let mlData;
+  try {
+    const mlRes = await fetch(`${config.modelApiUrl}/api/prediksi`, {
+      method: "POST",
+      body: form,
     });
+    mlData = await mlRes.json().catch(() => null);
+    if (!mlRes.ok) {
+      throw new AppError(mlData?.detail ?? mlData?.error ?? "Model API error", 500);
+    }
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(`Model API tidak dapat dijangkau (${config.modelApiUrl}): ${err.message}`, 500);
+  }
+
+  const predictions = Array.isArray(mlData?.predictions) ? mlData.predictions : [];
+  if (predictions.length === 0) {
+    throw new AppError("Model API tidak mengembalikan prediksi", 500);
+  }
+
+  for (const pred of predictions) {
+    const modelId = await ensureModelId(pred?.nama_model, pred?.versi);
+    if (modelId === null) continue;
+    const penyakitId = await resolvePenyakitId(pred?.label);
+    if (penyakitId === null) continue;
+    await query(
+      `INSERT INTO prediksi (riwayat_id, model_id, id_penyakit, confidence)
+       VALUES ($1, $2, $3, $4)`,
+      [id, modelId, penyakitId, clampConfidence(pred?.confidence)],
+    );
   }
 
   await query(

@@ -7,10 +7,12 @@ Backend-for-frontend (BFF) untuk **web-paru-paru** — aplikasi sistem informasi
 ```
 Frontend (Vite)  ──HTTP──▶  BFF (Express, :4000)  ──▶  PostgreSQL (pg Pool, SQL)
                                 │
-                                └──proxy /api/rag/chat──▶  RAG API (FastAPI, :8000)
+                                ├──proxy /api/rag/chat───────▶  service Python
+                                └──/api/prediksi (multipart)──▶  (FastAPI, :8000)
 ```
 
-- **`/api/rag/chat`** di-proxy BFF ke RAG API, sehingga frontend tidak perlu tahu alamat RAG.
+- **`/api/rag/chat`** di-proxy BFF ke service Python, sehingga frontend tidak perlu tahu alamat service.
+- **`POST /api/riwayat`** menerima upload gambar (multipart, `multer`, tersimpan di `server/uploads/`, dilayani statis `/uploads/*`); **`POST /api/riwayat/:id/analisis`** mengirim bytes gambar ke **service Python** (`/api/prediksi`) yang menghasilkan 3 prediksi dari 3 model berbeda, lalu BFF menyimpannya ke `prediksi`.
 - Semua akses database lewat pool `pg` (`src/db/pg.js`) dengan query ber-parameter (aman dari SQL injection). Skema dirapikan lewat `db/schema.sql` + `npm run db:schema`.
 
 ## Struktur Folder
@@ -46,7 +48,8 @@ Alur request: `app.js → routes/ → middlewares → controllers → query (pg 
 
 - Node.js >= 20
 - PostgreSQL lokal (mis. 16+) dengan database `capstone_paru`
-- RAG API (FastAPI) — opsional; hanya untuk `/api/rag/chat`
+- Service API Python (FastAPI) — chat RAG (`/api/rag/chat`) + analisis citra
+  (`/api/prediksi`) dalam **satu service**; lihat `../service/README.md`
 
 ## Setup
 
@@ -73,7 +76,8 @@ Alur request: `app.js → routes/ → middlewares → controllers → query (pg 
    | `NODE_ENV`                     | `development` / `production` |
    | `JWT_SECRET`                   | Secret untuk sign/verify JWT — wajib kuat, wajib ada di production |
    | `CORS_ORIGIN`                  | Origin yang diizinkan, pisahkan koma bila lebih dari satu |
-   | `RAG_API_URL`                  | Base URL RAG API (default `http://localhost:8000`) |
+   | `RAG_API_URL`                  | Base URL service Python gabungan RAG + Analisis (default `http://localhost:8000`) |
+   | `MODEL_API_URL`                | Override base URL analisis citra bila terpisah (default ikut `RAG_API_URL`) |
 
    > Di production, server **akan menolak start** bila `JWT_SECRET`, `PGPASSWORD`, `PGHOST`, atau `PGDATABASE` kosong (fail-fast).
 

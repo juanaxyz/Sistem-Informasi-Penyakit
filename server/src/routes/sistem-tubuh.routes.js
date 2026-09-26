@@ -5,6 +5,6 @@ const { handleGetSistemTubuh } = require("../controllers/sistem-tubuh.controller
 
 const router = express.Router();
 
-router.get("/sistem-tubuh", authMiddleware, requireRole("admin"), asyncHandler(handleGetSistemTubuh));
+router.get("/sistem-tubuh", asyncHandler(handleGetSistemTubuh));
 
 module.exports = router;

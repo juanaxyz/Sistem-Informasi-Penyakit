@@ -1,6 +1,33 @@
 const { query } = require("../db/pg");
 const { validateId } = require("../utils/validators");
+const { replaceManyToMany } = require("../utils/many-to-many");
 const AppError = require("../utils/AppError");
+
+/** Kosongkan nilai opsional menjadi NULL agar tidak bentrok dengan unique index. */
+function normalizeOptional(value) {
+  const s = value == null ? "" : String(value).trim();
+  return s.length === 0 ? null : s;
+}
+
+/** Simpan relasi banyak-ke-banyak pada tabel pivot penyakit (replace semua baris). */
+function replacePenyakitRelations(idPenyakit, { bagianTubuhIds, patogenIds }) {
+  return Promise.all([
+    replaceManyToMany({
+      table: "penyakit_bagian_tubuh",
+      parentColumn: "id_penyakit",
+      childColumn: "id_bagian_tubuh",
+      parentId: idPenyakit,
+      childIds: bagianTubuhIds,
+    }),
+    replaceManyToMany({
+      table: "penyakit_patogen",
+      parentColumn: "id_penyakit",
+      childColumn: "id_patogen",
+      parentId: idPenyakit,
+      childIds: patogenIds,
+    }),
+  ]);
+}
 
 const handleAdminListPenyakit = async (_req, res) => {
   const { rows } = await query(
@@ -33,6 +60,7 @@ const handleAdminCreatePenyakit = async (req, res) => {
     id_sistem_tubuh,
     code,
     bagian_tubuhIds,
+    patogenIds,
   } = req.body;
   if (
     !nama ||
@@ -55,29 +83,20 @@ const handleAdminCreatePenyakit = async (req, res) => {
     [
       nama,
       slug,
-      ringkasan ?? null,
-      thumbnail ?? null,
+      normalizeOptional(ringkasan),
+      normalizeOptional(thumbnail),
       tingkat_urgensi,
       id_sistem_tubuh,
-      code ?? null,
+      normalizeOptional(code),
     ],
   );
   const penyakitData = rows[0];
   if (!penyakitData) throw new AppError("Gagal membuat penyakit", 500);
 
-  if (bagian_tubuhIds.length > 0) {
-    const params = [];
-    const values = [];
-    bagian_tubuhIds.forEach((id_b, i) => {
-      params.push(`($1, $${i + 2})`);
-      values.push(id_b);
-    });
-    await query(
-      `INSERT INTO penyakit_bagian_tubuh (id_penyakit, id_bagian_tubuh)
-       VALUES ${params.join(", ")}`,
-      [penyakitData.id, ...values],
-    );
-  }
+  await replacePenyakitRelations(penyakitData.id, {
+    bagianTubuhIds,
+    patogenIds,
+  });
 
   res.status(201).json({ penyakit: penyakitData });
 };
@@ -95,6 +114,7 @@ const handleAdminUpdatePenyakit = async (req, res) => {
     id_sistem_tubuh,
     code,
     bagian_tubuhIds,
+    patogenIds,
   } = req.body;
   if (
     !nama ||
@@ -118,31 +138,19 @@ const handleAdminUpdatePenyakit = async (req, res) => {
     [
       nama,
       slug,
-      ringkasan ?? null,
-      thumbnail ?? null,
+      normalizeOptional(ringkasan),
+      normalizeOptional(thumbnail),
       tingkat_urgensi,
       id_sistem_tubuh,
-      code ?? null,
+      normalizeOptional(code),
       idPenyakit,
     ],
   );
 
-  await query(`DELETE FROM penyakit_bagian_tubuh WHERE id_penyakit = $1`, [
-    idPenyakit,
-  ]);
-  if (bagian_tubuhIds.length > 0) {
-    const params = [];
-    const values = [];
-    bagian_tubuhIds.forEach((id_b, i) => {
-      params.push(`($1, $${i + 2})`);
-      values.push(id_b);
-    });
-    await query(
-      `INSERT INTO penyakit_bagian_tubuh (id_penyakit, id_bagian_tubuh)
-       VALUES ${params.join(", ")}`,
-      [idPenyakit, ...values],
-    );
-  }
+  await replacePenyakitRelations(idPenyakit, {
+    bagianTubuhIds,
+    patogenIds,
+  });
 
   const { rows } = await query(
     `SELECT id, nama, slug, ringkasan, thumbnail, tingkat_urgensi,
