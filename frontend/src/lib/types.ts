@@ -1,4 +1,4 @@
-export type UrgencyLevel = "normal" | "waspada" | "darurat";
+﻿export type UrgencyLevel = "normal" | "waspada" | "darurat";
 
 export type Tampilan = "depan" | "belakang";
 
@@ -147,6 +147,11 @@ export interface PenyakitFormPayload {
   code?: string | null;
   bagian_tubuhIds: number[];
   patogenIds?: number[];
+  /**
+   * Daftar URL referensi penyakit. Saat update, `undefined` berarti "jangan
+   * sentuh" (server mempertahankan baris yang ada); `[]` berarti hapus semua.
+   */
+  referensi?: string[];
 }
 
 /** Daftar artikel ringkas untuk panel admin (drop-down daftar artikel). */

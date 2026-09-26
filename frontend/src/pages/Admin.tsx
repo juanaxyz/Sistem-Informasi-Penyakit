@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { FadeIn } from "@/components/FadeIn";
+import { ArticleProse } from "@/components/ArticleProse";
 import Dashboard from "./AdminDashboard";
 import { BodyMap } from "@/components/bodyMap/BodyMap";
-import type { UrgencyLevel, BodyPartRecord, SystemRecord, ArtikelBagian, Patogen, PenyakitFormPayload } from "@/lib/types";
+import type { UrgencyLevel, BodyPartRecord, SystemRecord, ArtikelBagian, Patogen } from "@/lib/types";
 
 interface PenyakitListItem {
   id: number;
@@ -25,10 +26,36 @@ interface PenyakitListItem {
 
 interface ArtikelListItem {
   id: number;
-  id_penyakit?: number;
+  /** Wajib: BFF selalu menyertakannya di daftar dan respons pembuatan artikel. */
+  id_penyakit: number;
   judul: string;
   konten: string;
   penyakit_nama: string;
+}
+
+/** Tombol kecil di toolbar formatting Markdown. */
+function ToolbarButton({
+  label,
+  title,
+  onClick,
+  children,
+}: {
+  label: string;
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={label}
+      className="flex h-6 min-w-6 items-center justify-center rounded px-1.5 text-ink transition hover:bg-pine/10 hover:text-pine focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+    >
+      {children}
+    </button>
+  );
 }
 
 export default function Admin() {
@@ -90,6 +117,23 @@ export default function Admin() {
 
   // Artikel Multi-Bagian State
   const [bagianList, setBagianList] = useState<ArtikelBagian[]>([]);
+
+  // Referensi (URL sumber) — hanya muncul di editor artikel. `referensiSaved`
+  // dipakai untuk menandai daftar yang belum tersimpan (dirty state).
+  const [referensiList, setReferensiList] = useState<string[]>([]);
+  const [referensiSaved, setReferensiSaved] = useState<string[]>([]);
+  const [referensiInput, setReferensiInput] = useState("");
+  const [referensiDraft, setReferensiDraft] = useState("");
+  const [referensiError, setReferensiError] = useState<string | null>(null);
+  const [referensiSaving, setReferensiSaving] = useState(false);
+  const [editingReferensi, setEditingReferensi] = useState<number | null>(null);
+  const referensiDirty =
+    referensiList.length !== referensiSaved.length ||
+    referensiList.some((url, i) => url !== referensiSaved[i]);
+
+  // Editor Markdown: pratinjau per bagian + akses ke textarea untuk toolbar.
+  const [previewBagian, setPreviewBagian] = useState<number | null>(null);
+  const bagianRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -252,6 +296,126 @@ export default function Admin() {
     });
   };
 
+  /**
+   * Referensi (URL sumber) dikelola dari editor artikel, bukan dari form
+   * penyakit. Datanya tetap milik penyakit (`referensi.id_penyakit`), tapi
+   * satu-satunya tempat UI-nya adalah saat menulis artikel.
+   *
+   * Validasi URL di sisi klien sengaja dibuat sama dengan `normalizeUrl` di
+   * BFF supaya tidak ada URL yang lolos di form lalu ditolak server.
+   */
+  const validateReferensiUrl = (raw: string): string | null => {
+    const value = raw.trim();
+    if (!value) return "URL referensi tidak boleh kosong";
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      return "URL tidak valid. Contoh: https://www.who.int/";
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "Hanya URL http:// atau https:// yang diperbolehkan";
+    }
+    if (value.length > 2000) return "URL terlalu panjang (maksimal 2000 karakter)";
+    return null;
+  };
+
+  /** Muat URL referensi penyakit yang sedang diedit artikelnya. */
+  const loadReferensi = async (idPenyakit: number) => {
+    setReferensiError(null);
+    setEditingReferensi(null);
+    setReferensiInput("");
+    try {
+      const res = await api.getDiseaseDetail(idPenyakit);
+      // Baris `referensi` bisa ber-`url` NULL dari data lama; form ini hanya
+      // menangani URL, jadi null diabaikan (server juga menolak URL invalid).
+      setReferensiList(
+        (res.penyakit.referensi || [])
+          .map((r) => r.url)
+          .filter((u): u is string => typeof u === "string" && u.length > 0),
+      );
+      setReferensiSaved(
+        (res.penyakit.referensi || [])
+          .map((r) => r.url)
+          .filter((u): u is string => typeof u === "string" && u.length > 0),
+      );
+    } catch (err) {
+      if (err instanceof ApiError) setReferensiError(err.message);
+      else setReferensiError("Gagal memuat referensi penyakit");
+    }
+  };
+
+  const handleAddReferensi = () => {
+    const invalid = validateReferensiUrl(referensiInput);
+    if (invalid) {
+      setReferensiError(invalid);
+      return;
+    }
+    // Normalisasi agar `https://who.int` dan `https://who.int/` tidak terduplikasi.
+    const url = new URL(referensiInput.trim()).toString();
+    if (referensiList.includes(url)) {
+      setReferensiError("URL ini sudah ada di daftar");
+      return;
+    }
+    setReferensiList((prev) => [...prev, url]);
+    setReferensiInput("");
+    setReferensiError(null);
+  };
+
+  const handleEditReferensi = (index: number, value: string) => {
+    const invalid = validateReferensiUrl(value);
+    if (invalid) {
+      setReferensiError(invalid);
+      return;
+    }
+    const url = new URL(value.trim()).toString();
+    const bentrok = referensiList.some((existing, i) => i !== index && existing === url);
+    if (bentrok) {
+      setReferensiError("URL ini sudah ada di daftar");
+      return;
+    }
+    setReferensiList((prev) => {
+      const next = [...prev];
+      next[index] = url;
+      return next;
+    });
+    setReferensiError(null);
+    setEditingReferensi(null);
+  };
+
+  const handleStartEditReferensi = (index: number) => {
+    setReferensiDraft(referensiList[index]);
+    setReferensiError(null);
+    setEditingReferensi(index);
+  };
+
+  const handleCancelEditReferensi = () => {
+    setReferensiError(null);
+    setEditingReferensi(null);
+  };
+
+  const handleRemoveReferensi = (index: number) => {
+    setReferensiList((prev) => prev.filter((_, i) => i !== index));
+    setReferensiError(null);
+    setEditingReferensi((prev) => (prev === index ? null : prev));
+  };
+
+  const handleSaveReferensi = async () => {
+    if (!selectedArtikel) return;
+    setReferensiSaving(true);
+    setReferensiError(null);
+    try {
+      await api.savePenyakitReferensi(selectedArtikel.id_penyakit, referensiList);
+      setReferensiSaved(referensiList);
+      setSuccess("Referensi berhasil disimpan");
+    } catch (err) {
+      if (err instanceof ApiError) setReferensiError(err.message);
+      else setReferensiError("Gagal menyimpan referensi");
+    } finally {
+      setReferensiSaving(false);
+    }
+  };
+
   const handleSavePenyakit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!penyakitForm.nama || !penyakitForm.slug || !penyakitForm.id_sistem_tubuh) {
@@ -263,22 +427,31 @@ export default function Admin() {
     setError(null);
     setSuccess(null);
     try {
-      const payload: PenyakitFormPayload = {
-        nama: penyakitForm.nama,
-        slug: penyakitForm.slug,
-        ringkasan: penyakitForm.ringkasan || null,
-        thumbnail: penyakitForm.thumbnail || null,
-        tingkat_urgensi: penyakitForm.tingkat_urgensi,
-        id_sistem_tubuh: Number(penyakitForm.id_sistem_tubuh),
-        code: penyakitForm.code || null,
-        bagian_tubuhIds: penyakitForm.bagian_tubuhIds,
-        patogenIds: penyakitForm.patogenIds,
-      };
       if (selectedPenyakit) {
-        await api.updatePenyakit(selectedPenyakit.id, payload);
+        await api.updatePenyakit(selectedPenyakit.id, {
+          nama: penyakitForm.nama,
+          slug: penyakitForm.slug,
+          ringkasan: penyakitForm.ringkasan || null,
+          thumbnail: penyakitForm.thumbnail || null,
+          tingkat_urgensi: penyakitForm.tingkat_urgensi,
+          id_sistem_tubuh: Number(penyakitForm.id_sistem_tubuh),
+          code: penyakitForm.code || null,
+          bagian_tubuhIds: penyakitForm.bagian_tubuhIds,
+          patogenIds: penyakitForm.patogenIds,
+        });
         setSuccess("Penyakit berhasil diperbarui");
       } else {
-        await api.createPenyakit(payload);
+        await api.createPenyakit({
+          nama: penyakitForm.nama,
+          slug: penyakitForm.slug,
+          ringkasan: penyakitForm.ringkasan || null,
+          thumbnail: penyakitForm.thumbnail || null,
+          tingkat_urgensi: penyakitForm.tingkat_urgensi,
+          id_sistem_tubuh: Number(penyakitForm.id_sistem_tubuh),
+          code: penyakitForm.code || null,
+          bagian_tubuhIds: penyakitForm.bagian_tubuhIds,
+          patogenIds: penyakitForm.patogenIds,
+        });
         setSuccess("Penyakit baru berhasil ditambahkan");
       }
       // Refresh list
@@ -317,6 +490,8 @@ export default function Admin() {
           },
         ]);
       }
+      // Referensi ikut ditampilkan di editor artikel.
+      void loadReferensi(artikel.id_penyakit);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError("Gagal memuat bagian artikel");
@@ -464,6 +639,8 @@ export default function Admin() {
           urutan: 1,
         },
       ]);
+      // Referensi ikut ditampilkan di editor artikel.
+      void loadReferensi(artikel.id_penyakit);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError("Gagal membuat artikel");
@@ -494,6 +671,59 @@ export default function Admin() {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
       return next;
+    });
+  };
+
+  /**
+   * Terapkan pembungkus Markdown (mis. `**tebal**`) pada pilihan kursor.
+   * Kalau tidak ada teks yang dipilih, sisipkan `placeholder` sebagai contoh
+   * supaya admin langsung tahu formatnya.
+   */
+  const applyMarkdownWrap = (
+    index: number,
+    before: string,
+    after: string,
+    placeholder: string,
+  ) => {
+    const el = bagianRefs.current[index];
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const current = bagianList[index]?.konten ?? "";
+    const selected = current.slice(start, end) || placeholder;
+    const next = current.slice(0, start) + before + selected + after + current.slice(end);
+    handleBagianChange(index, "konten", next);
+    requestAnimationFrame(() => {
+      el.focus();
+      // Kursor ditaruh di dalam placeholder agar mudah diketik setelahnya.
+      const caret = start + before.length;
+      el.setSelectionRange(caret, caret + selected.length);
+    });
+  };
+
+  /**
+   * Terapkan awalan baris (mis. `## ` atau `- `) ke setiap baris yang sedang
+   * dipilih. Kalau tidak ada pilihan, sisipkan satu baris baru di akhir konten.
+   */
+  const applyMarkdownLine = (index: number, prefix: string) => {
+    const el = bagianRefs.current[index];
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const current = bagianList[index]?.konten ?? "";
+    const next =
+      end > start
+        ? current
+            .slice(0, start)
+            .split("\n")
+            .map((line) => prefix + line)
+            .join("\n") + current.slice(end)
+        : `${current}${current.length > 0 ? "\n" : ""}${prefix}`;
+    handleBagianChange(index, "konten", next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const caret = next.length;
+      el.setSelectionRange(caret, caret);
     });
   };
 
@@ -917,8 +1147,6 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  
-
                   <div className="flex justify-end gap-3 pt-4 border-t border-border">
                     <Button type="button" variant="outline" onClick={closePenyakitModal}>
                       Batal
@@ -1047,16 +1275,100 @@ export default function Admin() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-muted-foreground mb-1">
-                          Konten Markdown
-                        </label>
-                        <textarea
-                          rows={6}
-                          value={b.konten || ""}
-                          onChange={(e) => handleBagianChange(idx, "konten", e.target.value)}
-                          placeholder="Tuliskan isi edukasi dalam format Markdown..."
-                          className="w-full rounded-md border border-border bg-background p-3 text-sm font-sans text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
-                        />
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <label className="block text-xs font-medium text-muted-foreground">
+                            Konten Markdown
+                          </label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setPreviewBagian((prev) => (prev === idx ? null : idx))
+                            }
+                            aria-pressed={previewBagian === idx}
+                            className="h-6 px-2 text-[11px] text-muted-foreground hover:text-pine"
+                          >
+                            {previewBagian === idx ? "Sembunyikan pratinjau" : "Pratinjau"}
+                          </Button>
+                        </div>
+
+                        {/* Toolbar formatting: admins tidak perlu menghafal sintaks. */}
+                        <div className="mb-1.5 flex flex-wrap items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1">
+                          <ToolbarButton
+                            label="Tebal"
+                            title="Tebal (Ctrl+B)"
+                            onClick={() => applyMarkdownWrap(idx, "**", "**", "teks tebal")}
+                          >
+                            <span className="font-bold text-xs">B</span>
+                          </ToolbarButton>
+                          <ToolbarButton
+                            label="Miring"
+                            title="Miring (Ctrl+I)"
+                            onClick={() => applyMarkdownWrap(idx, "_", "_", "teks miring")}
+                          >
+                            <span className="italic font-serif text-xs">I</span>
+                          </ToolbarButton>
+                          <ToolbarButton
+                            label="Subjudul"
+                            title="Subjudul (##)"
+                            onClick={() => applyMarkdownLine(idx, "## ")}
+                          >
+                            <span className="text-xs font-semibold">H2</span>
+                          </ToolbarButton>
+                          <ToolbarButton
+                            label="Daftar"
+                            title="Daftar berbutir (-)"
+                            onClick={() => applyMarkdownLine(idx, "- ")}
+                          >
+                            <span className="text-xs">•</span>
+                          </ToolbarButton>
+                          <ToolbarButton
+                            label="Tautan"
+                            title="Tautan ([teks](url))"
+                            onClick={() =>
+                              applyMarkdownWrap(idx, "[", "](https://)", "teks tautan")
+                            }
+                          >
+                            <span className="text-xs underline">Tautan</span>
+                          </ToolbarButton>
+                          <span className="ml-auto pr-1 text-[10px] text-muted-foreground">
+                            Markdown
+                          </span>
+                        </div>
+
+                        <div
+                          className={
+                            previewBagian === idx ? "grid gap-3 lg:grid-cols-2" : ""
+                          }
+                        >
+                          <textarea
+                            ref={(el) => {
+                              bagianRefs.current[idx] = el;
+                            }}
+                            rows={previewBagian === idx ? 18 : 16}
+                            value={b.konten || ""}
+                            onChange={(e) =>
+                              handleBagianChange(idx, "konten", e.target.value)
+                            }
+                            placeholder="Tuliskan isi edukasi. Pilih teks lalu gunakan tombol di atas untuk menebalkan, membuat subjudul, daftar, atau tautan."
+                            className="w-full rounded-md border border-border bg-background p-3 text-sm font-sans text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                          />
+                          {previewBagian === idx && (
+                            <div className="rounded-md border border-border bg-background/50 p-3">
+                              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                Pratinjau
+                              </p>
+                              {b.konten ? (
+                                <ArticleProse>{b.konten}</ArticleProse>
+                              ) : (
+                                <p className="text-xs italic text-muted-foreground">
+                                  Belum ada konten untuk ditampilkan.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1069,6 +1381,153 @@ export default function Admin() {
                   >
                     + Tambah Bagian / Seksi Baru
                   </Button>
+                </div>
+
+                {/* Referensi — URL sumber penyakit, ditampilkan di bagian "Referensi"
+                    pada halaman detail penyakit. Disimpan terpisah dari konten
+                    artikel karena datanya milik penyakit, bukan artikel. */}
+                <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-semibold text-ink">
+                        Referensi / Sumber Medis
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Tautan yang ditampilkan pada bagian "Referensi" di halaman
+                        penyakit, misalnya WHO, Kemenkes, atau jurnal ilmiah.
+                      </p>
+                    </div>
+                    {referensiDirty && (
+                      <span className="text-[11px] font-medium text-amber-600">
+                        Belum disimpan
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      id="referensi-input-artikel"
+                      type="url"
+                      value={referensiInput}
+                      onChange={(e) => {
+                        setReferensiInput(e.target.value);
+                        if (referensiError) setReferensiError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddReferensi();
+                        }
+                      }}
+                      placeholder="https://www.who.int/..."
+                      aria-invalid={referensiError ? true : undefined}
+                      aria-describedby={referensiError ? "referensi-error-artikel" : undefined}
+                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAddReferensi}
+                      disabled={referensiSaving}
+                      className="shrink-0 bg-pine text-white hover:bg-pine/90"
+                    >
+                      + Tambah
+                    </Button>
+                  </div>
+                  {referensiError && (
+                    <p id="referensi-error-artikel" role="alert" className="text-xs text-red-600">
+                      {referensiError}
+                    </p>
+                  )}
+
+                  <ul className="space-y-1.5">
+                    {referensiList.length === 0 ? (
+                      <li className="text-xs text-muted-foreground italic">
+                        Belum ada referensi.
+                      </li>
+                    ) : (
+                      referensiList.map((url, index) =>
+                        editingReferensi === index ? (
+                          <li
+                            key={`edit-${index}`}
+                            className="flex items-center gap-2 rounded-lg border border-pine/40 bg-background px-3 py-2"
+                          >
+                            <input
+                              type="url"
+                              value={referensiDraft}
+                              onChange={(e) => setReferensiDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleEditReferensi(index, referensiDraft);
+                                }
+                                if (e.key === "Escape") handleCancelEditReferensi();
+                              }}
+                              className="w-full bg-transparent text-sm text-ink outline-none"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleEditReferensi(index, referensiDraft)}
+                              className="shrink-0 bg-pine text-white hover:bg-pine/90"
+                            >
+                              Simpan
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleCancelEditReferensi}
+                              className="shrink-0"
+                            >
+                              Batal
+                            </Button>
+                          </li>
+                        ) : (
+                          <li
+                            key={url}
+                            className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2"
+                          >
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={url}
+                              className="min-w-0 flex-1 truncate text-sm text-pine hover:underline"
+                            >
+                              {url}
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditReferensi(index)}
+                              aria-label={`Ubah referensi ${url}`}
+                              className="shrink-0 rounded p-1 text-xs text-muted-foreground hover:bg-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+                            >
+                              Ubah
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveReferensi(index)}
+                              aria-label={`Hapus referensi ${url}`}
+                              className="shrink-0 rounded p-1 text-xs text-muted-foreground hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+                            >
+                              Hapus
+                            </button>
+                          </li>
+                        ),
+                      )
+                    )}
+                  </ul>
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleSaveReferensi}
+                      disabled={referensiSaving || !referensiDirty}
+                      className="bg-pine text-white hover:bg-pine/90"
+                    >
+                      {referensiSaving ? "Menyimpan..." : "Simpan Referensi"}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-border">

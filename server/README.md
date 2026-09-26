@@ -20,7 +20,7 @@ Frontend (Vite)  ──HTTP──▶  BFF (Express, :4000)  ──▶  PostgreSQ
 ```
 server/
 ├── db/
-│   └── schema.sql                 # Skema PostgreSQL (idempotent) — users, riwayat, prediksi, artikel, artikel_bagian
+│   └── schema.sql                 # Skema PostgreSQL (idempotent) — users, riwayat, prediksi, artikel, artikel_bagian, referensi
 ├── scripts/
 │   └── apply-schema.js            # Terapkan schema.sql ke PG lokal (npm run db:schema)
 ├── src/
@@ -81,7 +81,7 @@ Alur request: `app.js → routes/ → middlewares → controllers → query (pg 
 
    > Di production, server **akan menolak start** bila `JWT_SECRET`, `PGPASSWORD`, `PGHOST`, atau `PGDATABASE` kosong (fail-fast).
 
-3. Terapkan skema database (menambah tabel `users`, `riwayat`, `prediksi`, `artikel`, `artikel_bagian`; idempotent):
+3. Terapkan skema database (menambah tabel `users`, `riwayat`, `prediksi`, `artikel`, `artikel_bagian`, `referensi`; idempotent):
 
    ```bash
    npm run db:schema

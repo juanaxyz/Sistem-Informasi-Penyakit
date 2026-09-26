@@ -180,8 +180,24 @@
   color: var(--color-foreground);
   overflow-wrap: break-word;
   word-wrap: break-word;
-  white-space: pre-line;
   letter-spacing: -0.005em;
+  text-align: left;
+}
+
+/* Heading punya anchor tautan yang muncul saat hover/fokus. */
+.article-heading-anchor {
+  color: var(--color-muted-foreground);
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.group\/section:hover .article-heading-anchor,
+.article-heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+.article-heading-anchor:hover {
+  color: var(--color-pine);
 }
 
 .article-prose h1 {

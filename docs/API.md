@@ -136,8 +136,55 @@ Content-Type: application/json
 }
 ```
 
+Field `referensi` juga diterima di sini, tapi jalur yang dipakai panel admin
+adalah `PUT /api/penyakit/:id/referensi` (lihat di bawah).
+
 Nilai kosong untuk `ringkasan` / `thumbnail` / `code` otomatis disimpan sebagai
 `NULL`, sehingga tidak melanggar unique index (`penyakit_code_key`, dst.).
+
+`referensi` adalah daftar URL sumber yang tampil di bagian "Referensi" pada halaman
+detail penyakit. Aturannya:
+
+- Hanya `http:` dan `https:` yang diterima; URL lain (mis. `javascript:`) →
+  `400` dengan pesan `referensi tidak valid: ...`, dan **tidak ada** data yang
+  ditulis.
+- URL dinormalisasi ke bentuk kanonik, jadi `https://who.int` dan
+  `https://who.int/` dianggap sama. Entri kosong diabaikan, duplikat diringkas,
+  maksimal 50 URL per penyakit.
+- Pada `PUT`, baris `referensi` untuk penyakit tersebut dihapus lalu disisipkan
+  ulang (tabel ini tidak punya kolom `diperbarui_pada`, jadi `id` baris ikut
+  berubah setiap disimpan). Kalau field `referensi` **dikirim kosong** → hapus
+  semua; kalau **tidak dikirim sama sekali** → baris yang ada tidak disentuh,
+  sehingga klien lama tidak ikut menghapus data.
+
+### Admin — Simpan Referensi (dipakai editor artikel)
+
+```http
+PUT /api/penyakit/1/referensi
+Authorization: Bearer <token-admin>
+Content-Type: application/json
+
+{ "referensi": ["https://www.who.int/news-room/fact-sheets/detail/coronavirus-disease-(covid-19)"] }
+```
+
+Respons:
+
+```json
+{ "referensi": ["https://www.who.int/news-room/fact-sheets/detail/coronavirus-disease-(covid-19)"] }
+```
+
+Endpoint ini adalah jalur yang dipakai panel admin, karena referensinya dikelola
+dari **editor artikel** — bukan dari form penyakit. Alasannya dipisah dari
+`PUT /api/penyakit/:id`: endpoint penyakit mewajibkan `nama`, `slug`,
+`tingkat_urgensi`, `id_sistem_tubuh`, dan `bagian_tubuhIds`, sedangkan editor
+artikel tidak memegang data penyakit tersebut. Endpoint ini hanya menyentuh
+tabel `referensi`, jadi edit sumber tidak pernah menimpa kolom penyakit lain.
+
+- `referensi` wajib berupa array. String atau objek → `400`.
+- `id_penyakit` tidak ada di database → `400`.
+- Validasi URL, normalisasi, duplikat, dan batas 50 sama persis dengan
+  `POST`/`PUT /api/penyakit`. Array kosong → hapus semua.
+- Wajib JWT dengan role `admin` (`401` tanpa token, `403` untuk role lain).
 
 ### Admin — Patogen & Relasi ke Penyakit
 

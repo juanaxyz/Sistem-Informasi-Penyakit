@@ -2,6 +2,70 @@
 
 Catatan perubahan penting pada project.
 
+## [2026-09-26] — Referensi penyakit, editor artikel, dan tampilan baca
+
+### Fitur
+
+- Referensi/Sumber Medis kini dikelola dari **editor artikel**, bukan form
+  penyakit. Blok **Referensi / Sumber Medis** di `Admin.tsx` menyediakan tambah
+  URL, ubah, dan hapus, plus tombol **Simpan Referensi** dan penanda "Belum
+  disimpan". Validasi klien (`http:`/`https:` saja) dibuat sama dengan aturan
+  server supaya tidak ada URL yang lolos di form lalu ditolak BFF.
+- Endpoint baru `PUT /api/penyakit/:id/referensi` (role `admin`). Dipisah dari
+  `PUT /api/penyakit/:id` karena endpoint penyakit mewajibkan `nama`, `slug`,
+  `tingkat_urgensi`, `id_sistem_tubuh`, dan `bagian_tubuhIds`, sedangkan editor
+  artikel tidak memegang data penyakit. Endpoint ini hanya menyentuh tabel
+  `referensi`, jadi edit sumber tidak pernah menimpa kolom penyakit lain.
+- `POST /api/penyakit` dan `PUT /api/penyakit/:id` tetap menerima field
+  `referensi` sebagai array URL, disimpan lewat `replacePenyakitReferences()`.
+  Kalau field ini **tidak dikirim** pada `PUT`, baris yang ada tidak disentuh;
+  dikirim `[]` berarti hapus semua.
+- URL dinormalisasi ke bentuk kanonik (`https://who.int` → `https://who.int/`),
+  entri kosong diabaikan, duplikat diringkas, maksimal 50 per penyakit.
+  `normalizeUrl()` ditambahkan ke `server/src/utils/validators.js`.
+- `server/db/schema.sql` sekarang ikut mendefinisikan tabel `referensi`
+  (idempotent) beserta index `id_penyakit`, karena tabel ini tidak lagi
+  diasumsikan "sudah ada" tapi dikelola BFF.
+- Toolbar formatting di editor artikel (tebal, miring, subjudul, daftar,
+  tautan) yang menyisipkan sintaks Markdown di posisi kursor, plus tombol
+  **Pratinjau** per bagian yang merender Markdown dengan gaya yang sama seperti
+  halaman detail. Tinggi textarea dinaikkan dari 6 ke 16 baris.
+
+### Perbaikan
+
+- **Styling artikel di halaman detail praktis tidak aktif.** `ArticleProse`
+  beserta 37 aturan `.article-prose` di `src/index.css` tidak pernah dipakai:
+  `DiseaseDetailPage.tsx` merender `<Markdown>` polos dengan kelas `prose` dari
+  plugin `@tailwindcss/typography` yang **tidak terpasang** dan tidak ada
+  `tailwind.config.js`, sehingga kelas itu no-op. Heading, list, blockquote, dan
+  tabel di dalam artikel tampil nyaris tanpa style. `DiseaseDetailPage.tsx`
+  sekarang memakai `ArticleProse`.
+- `white-space: pre-line` pada `.article-prose` dihapus. Aturan itu warisan dari
+  teks polos, tapi kontainer ini berisi elemen blok dari `react-markdown`, jadi
+  aturan tersebut hanya menambah celah tak terduga. Teks juga diubah dari rata
+  kanan ke rata kiri karena rata kanan menghasilkan celah buruk pada kata
+  panjang seperti nama obat Latin.
+- Tiap seksi artikel sekarang punya anchor sendiri (`#bagian-<id>`) dengan ikon
+  rantai yang menyalin tautan saat diklik, dan halaman detail punya progress bar
+  baca di atas. Artikel penyakit bisa sangat panjang, jadi ini memudahkan
+  navigasi.
+- **Bug lama yang belum ketahui tes**: `admin-penyakit.controller.js`
+  mendestruksi `bagian_tubuhIds` tapi meneruskan `bagianTubuhIds` (huruf
+  besar-kecil beda) ke `replacePenyakitRelations()`. Akibatnya `POST`/`PUT
+  /api/penyakit` selalu melempar `ReferenceError` → 500. Tidak ada tes yang
+  menyentuh handler ini, jadi bugnya bertahan sejak Admin penyakit pertama kali
+  ditulis. Sekarang diperbaiki dan ditutup oleh tes baru.
+- `INSERT INTO referensi` sempat salah bentuk (3 kolom tapi tiap tuple hanya 2
+  nilai, dengan `CURRENT_TIMESTAMP` menggantung sebagai tuple sendiri) → 500.
+  Tes tidak menangkapnya karena `query` di-mock; sekarang ada tes yang
+  memverifikasi jumlah kolom, nilai per tuple, dan placeholder `$1..$n`.
+- `ArtikelListItem.id_penyakit` di `Admin.tsx` ditandai opsional padahal BFF
+  selalu mengirimnya, sehingga `tsc -b` gagal saat dipakai sebagai argumen
+  `number`. Sekarang wajib, sesuai respons API.
+- `service/RAG_ARCHITECTURE.md` dan `service/app/services/chunking.py` rusak
+  encoding (double-encoded UTF-8, mis. `—` jadi `â€”`) sejak commit
+  `c0016c6`; sudah dikembalikan ke UTF-8 yang benar.
+
 ## [2026-09-26] — Embedding lokal, chunking per token, sinkronisasi dari Admin
 
 ### BREAKING — model embedding

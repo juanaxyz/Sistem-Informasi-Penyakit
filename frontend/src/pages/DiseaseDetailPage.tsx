@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDiseaseDetail } from "@/hooks/useDiseaseDetail";
 import { Button } from "@/components/ui/button";
@@ -8,21 +8,101 @@ import { Badge } from "@/components/ui/badge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { BodyPartPreview } from "@/components/BodyPartPreview";
 import { MedicalDisclaimer } from "@/components/MedicalDisclaimer";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { ArticleProse } from "@/components/ArticleProse";
 
 /** Judul section artikel yang konsisten: display font + aksen bar pine di kiri. */
-function ArticleHeading({ children }: { children: ReactNode }) {
+function ArticleHeading({
+  children,
+  id,
+  anchorable = false,
+}: {
+  children: ReactNode;
+  id?: string;
+  anchorable?: boolean;
+}) {
   return (
-    <h2 className="flex items-center gap-2.5 font-display text-xl md:text-2xl font-semibold tracking-tight text-ink">
+    <h2
+      id={id}
+      className="group/section flex items-center gap-2.5 scroll-mt-24 font-display text-xl md:text-2xl font-semibold tracking-tight text-ink"
+    >
       <span
         aria-hidden="true"
         className="h-5 md:h-6 w-1 shrink-0 rounded-full bg-pine"
       />
       {children}
+      {anchorable && id && (
+        <a
+          href={`#${id}`}
+          aria-label={`Salin tautan ke bagian ${typeof children === "string" ? children : "ini"}`}
+          title="Salin tautan ke bagian ini"
+          onClick={(e) => {
+            e.preventDefault();
+            const url = `${window.location.origin}${window.location.pathname}#${id}`;
+            void navigator.clipboard?.writeText(url);
+          }}
+          className="article-heading-anchor shrink-0 rounded focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <LinkIcon />
+        </a>
+      )}
     </h2>
   );
 }
+
+/** Ikon rantai untuk anchor tautan seksi artikel. */
+function LinkIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+/**
+ * Progress bar baca di atas halaman. Artikel penyakit bisa sangat panjang
+ * (ringkasan, gejala, penyebab, diagnosis, penanganan, pencegahan), jadi
+ * penanda posisi baca membantu pengguna tahu tinggal berapa lagi.
+ */
+function ReadingProgress() {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      setProgress(scrollable > 0 ? Math.min(100, (window.scrollY / scrollable) * 100) : 0);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+
+  return (
+    <div
+      aria-hidden="true"
+      className="fixed inset-x-0 top-0 z-50 h-1 bg-transparent"
+    >
+      <div
+        className="h-full bg-pine transition-[width] duration-150 ease-out"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  );
+}
+
 const CustomTableComponents = {
   table: ({ children }: any) => (
     <div className="overflow-x-auto my-4 rounded-lg border border-gray-300 shadow-sm">
@@ -137,6 +217,7 @@ export function DiseaseDetailPage() {
 
   return (
     <div className="space-y-4">
+      <ReadingProgress />
       <Button
         variant="ghost"
         size="sm"
@@ -198,26 +279,34 @@ export function DiseaseDetailPage() {
             </header>
           </FadeIn>
           {data.artikel.length > 0 && (
-            <div className="space-y-8 mt-6">
-              {data.artikel.map((article) => (
-                <div key={article.id} className="space-y-8">
-                  {article.bagian && article.bagian.length > 0 ? (
-                    article.bagian.map((sec) => (
-                      <section key={sec.id || sec.urutan} className="space-y-3">
-                        {sec.judul && <ArticleHeading>{sec.judul}</ArticleHeading>}
-                        <div className="font-serif text-justify leading-loose prose max-w-none px-1">
-                          <Markdown
-                            remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
-                            components={CustomTableComponents}
-                          >
+            <div className="mt-6 space-y-8">
+              {data.artikel.map((article) =>
+                article.bagian && article.bagian.length > 0 ? (
+                  <div key={article.id} className="space-y-8">
+                    {article.bagian.map((sec) => {
+                      const anchorId = `bagian-${sec.id ?? sec.urutan}`;
+                      return (
+                        <section key={anchorId} id={anchorId} className="scroll-mt-24 space-y-3">
+                          {sec.judul && (
+                            <ArticleHeading id={anchorId} anchorable>
+                              {sec.judul}
+                            </ArticleHeading>
+                          )}
+                          {/*
+                            `ArticleProse` memegang seluruh styling heading, list,
+                            blockquote, tabel, dan kode. Jangan pakai kelas
+                            `prose` di sini: plugin typography tidak terpasang,
+                            jadi kelas itu tidak melakukan apa pun.
+                          */}
+                          <ArticleProse components={CustomTableComponents}>
                             {sec.konten}
-                          </Markdown>
-                        </div>
-                      </section>
-                    ))
-                  ) : null}
-                </div>
-              ))}
+                          </ArticleProse>
+                        </section>
+                      );
+                    })}
+                  </div>
+                ) : null,
+              )}
             </div>
           )}
           {data.bagian_tubuh.length > 0 && (

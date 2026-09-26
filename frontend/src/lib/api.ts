@@ -191,6 +191,15 @@ export const api = {
       post<{ penyakit: DiseaseDetail }>("/api/penyakit", payload),
     updatePenyakit: (id: number, payload: PenyakitFormPayload) =>
       put<{ penyakit: DiseaseDetail }>(`/api/penyakit/${id}`, payload),
+    /**
+     * Simpan daftar URL referensi satu penyakit.
+     *
+     * Dipisah dari `updatePenyakit` karena referensi dikelola dari editor
+     * artikel, yang tidak memegang field penyakit (nama, slug, bagian tubuh,
+     * dst.) dan `PUT /api/penyakit/:id` mewajibkan semuanya.
+     */
+    savePenyakitReferensi: (id: number, referensi: string[]) =>
+      put<{ referensi: string[] }>(`/api/penyakit/${id}/referensi`, { referensi }),
     getArtikelList: () => get<{ artikel: ArtikelSummary[] }>("/api/artikel"),
     createArtikel: (idPenyakit: number) =>
       post<{ artikel: ArtikelSummary }>("/api/artikel", { id_penyakit: idPenyakit }),

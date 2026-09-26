@@ -124,7 +124,7 @@ konstanta internal (bukan input user) demi keamanan SQL injection.
 | `patogen` + `penyakit_patogen` | Patogen penyebab (virus/bakteri/jamur/parasit) & relasi N-N  |
 | `penyakit_bagian_tubuh`     | Relasi N-N penyakit ↔ bagian tubuh (Body Map multi-select)     |
 | `artikel` + `artikel_bagian`| Artikel edukasi per penyakit, tersusun atas seksi (`tipe`, `urutan`) |
-| `referensi`                 | Referensi/sumber tiap penyakit                                 |
+| `referensi`                 | Referensi/sumber tiap penyakit. URL disimpan sebagai teks; ditulis BFF dari editor artikel di panel admin lewat `PUT /api/penyakit/:id/referensi` (tabel ini anak satu-ke-banyak dari `penyakit`, bukan per artikel) |
 | `riwayat`                   | Riwayat analisis gambar per user (`processing`/`completed`/`failed`) |
 | `prediksi`                  | Hasil prediksi per model per riwayat                           |
 | `model`                     | Daftar model AI aktif                                          |

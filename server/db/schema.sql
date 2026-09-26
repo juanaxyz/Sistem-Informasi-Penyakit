@@ -1,6 +1,10 @@
 -- Skema tambahan untuk BFF web-paru-paru (PostgreSQL lokal).
 -- Aman dijalankan ulang (idempotent). Tabel inti (penyakit, bagian_tubuh,
--- sistem_tubuh, referensi, model, dll.) diasumsikan sudah ada.
+-- sistem_tubuh, model, dll.) diasumsikan sudah ada.
+--
+-- Pengecualian: `referensi` ikut didefinisikan di sini karena kini dikelola
+-- BFF (form penyakit di panel admin menyimpan daftar URL), jadi harus bisa
+-- dibuat ulang dari repo ini.
 
 CREATE TABLE IF NOT EXISTS users (
     id              integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -59,3 +63,18 @@ CREATE TABLE IF NOT EXISTS artikel_bagian (
 );
 
 CREATE INDEX IF NOT EXISTS artikel_bagian_id_artikel_idx ON artikel_bagian(id_artikel);
+
+-- Daftar URL sumber per penyakit, ditampilkan di halaman detail penyakit.
+-- Mengikuti bentuk tabel yang sudah ada di capstone_paru: `id_penyakit` tanpa
+-- ON DELETE CASCADE dan tanpa `diperbarui_pada` (sinkronisasi_admin memakai
+-- pola delete + insert ulang, lihat admin-penyakit.controller.js).
+-- `url` sengaja boleh NULL dan tidak unik supaya baris lama yang tidak punya
+-- tautan tidak menghalangi, meski normalisasi di controller menolak URL invalid.
+CREATE TABLE IF NOT EXISTS referensi (
+    id           integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id_penyakit  integer NOT NULL REFERENCES penyakit(id),
+    url          text,
+    dibuat_pada  timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS referensi_id_penyakit_idx ON referensi(id_penyakit);

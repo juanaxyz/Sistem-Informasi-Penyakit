@@ -613,6 +613,338 @@ describe("API Test Suite", () => {
     });
   });
 
+  // --- REFERENSI PENYAKIT (disimpan lewat form admin) ---
+  describe("Referensi pada form admin penyakit", () => {
+    const adminAuth = { Authorization: `Bearer ${signToken({ role: "admin" })}` };
+    const basePayload = {
+      nama: "Maag",
+      slug: "maag",
+      tingkat_urgensi: "normal",
+      id_sistem_tubuh: 2,
+      bagian_tubuhIds: [],
+      patogenIds: [],
+    };
+
+    // Semua query dibalas baris yang sama; urutan panggilan dicek lewat
+    // `mockQuery.mock.calls` supaya tes tidak bergantung pada urutan internals
+    // `Promise.all` milik replacePenyakitRelations.
+    const stubAllQueries = () => mockQuery.mockResolvedValue(ok([{ id: 7, nama: "Maag" }]));
+
+    const callsMatching = (pattern) =>
+      mockQuery.mock.calls.filter(([sql]) => pattern.test(sql));
+
+    it("harus menyimpan referensi pada POST /api/penyakit", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .post("/api/penyakit")
+        .set(adminAuth)
+        .send({
+          ...basePayload,
+          referensi: ["https://www.who.int/news-room/fact-sheets/detail/gastro-oesophageal-reflux-disease-(gerd)"],
+        });
+
+      expect(res.status).toBe(201);
+      const del = callsMatching(/DELETE FROM referensi/);
+      const ins = callsMatching(/INSERT INTO referensi/);
+      expect(del).toHaveLength(1);
+      expect(del[0][1]).toEqual([7]);
+      expect(ins).toHaveLength(1);
+      expect(ins[0][1]).toEqual([7, expect.stringContaining("https://www.who.int/")]);
+    });
+
+    it("harus menormalkan dan membuang URL duplikat serta entri kosong", async () => {
+      stubAllQueries();
+      await request(app)
+        .post("/api/penyakit")
+        .set(adminAuth)
+        .send({
+          ...basePayload,
+          referensi: [
+            "https://who.int",
+            "https://who.int/",
+            "  https://who.int/  ",
+            "",
+            "   ",
+          ],
+        });
+
+      const ins = callsMatching(/INSERT INTO referensi/);
+      expect(ins).toHaveLength(1);
+      // `https://who.int` dinormalisasi menjadi `https://who.int/` lalu
+      // collapse jadi satu baris; entri kosong tidak menghasilkan apa pun.
+      expect(ins[0][1]).toEqual([7, "https://who.int/"]);
+    });
+
+    it("harus menolak URL yang bukan http/https dengan 400", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .post("/api/penyakit")
+        .set(adminAuth)
+        .send({ ...basePayload, referensi: ["javascript:alert(1)"] });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/referensi tidak valid/);
+      // Validasi terjadi sebelum query apa pun yang mengubah data.
+      expect(callsMatching(/INSERT INTO referensi/)).toHaveLength(0);
+    });
+
+    it("harus menolak string yang bukan URL dengan 400", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .post("/api/penyakit")
+        .set(adminAuth)
+        .send({ ...basePayload, referensi: ["bukan url"] });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/referensi tidak valid/);
+    });
+
+    it("harus menolak lebih dari 50 referensi dengan 400", async () => {
+      stubAllQueries();
+      const referensi = Array.from(
+        { length: 51 },
+        (_, i) => `https://example.com/sumber/${i}`,
+      );
+      const res = await request(app)
+        .post("/api/penyakit")
+        .set(adminAuth)
+        .send({ ...basePayload, referensi });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/maksimal 50 referensi/);
+    });
+
+    it("harus menghapus semua referensi tanpa insert saat dikirim array kosong", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7")
+        .set(adminAuth)
+        .send({ ...basePayload, referensi: [] });
+
+      expect(res.status).toBe(200);
+      expect(callsMatching(/DELETE FROM referensi/)).toHaveLength(1);
+      expect(callsMatching(/INSERT INTO referensi/)).toHaveLength(0);
+    });
+
+    it("harus tidak menyentuh tabel referensi saat field tidak dikirim", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7")
+        .set(adminAuth)
+        .send(basePayload);
+
+      expect(res.status).toBe(200);
+      expect(callsMatching(/FROM referensi/)).toHaveLength(0);
+    });
+
+    it("harus menyimpan referensi baru pada PUT /api/penyakit/:id", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7")
+        .set(adminAuth)
+        .send({ ...basePayload, referensi: ["https://id.wikipedia.org/wiki/Maag"] });
+
+      expect(res.status).toBe(200);
+      const ins = callsMatching(/INSERT INTO referensi/);
+      expect(ins).toHaveLength(1);
+      expect(ins[0][1]).toEqual([7, "https://id.wikipedia.org/wiki/Maag"]);
+    });
+
+    // Mock `query` tidak memvalidasi SQL, jadi bentuk kalimatnya diuji di sini:
+    // jumlah kolom harus sama dengan jumlah nilai per tuple, dan placeholder
+    // harus berurutan $1..$n sesuai panjang array parameter.
+    it("harus menghasilkan SQL referensi yang jumlah kolomnya cocok", async () => {
+      stubAllQueries();
+      await request(app)
+        .put("/api/penyakit/7")
+        .set(adminAuth)
+        .send({
+          ...basePayload,
+          referensi: ["https://a.example.com", "https://b.example.com", "https://c.example.com"],
+        });
+
+      const ins = callsMatching(/INSERT INTO referensi/);
+      expect(ins).toHaveLength(1);
+      const [sql, params] = ins[0];
+
+      const columns = sql.match(/\(([^)]*)\)\s*VALUES/i)[1].split(",").map((c) => c.trim());
+      expect(columns).toEqual(["id_penyakit", "url"]);
+
+      const tuples = sql.slice(sql.indexOf("VALUES")).replace(/^VALUES/i, "").trim();
+      const rows = tuples.split(/\),\s*\(/);
+      rows.forEach((row) => {
+        // Setiap tuple harus berisi tepat 2 placeholder, sama dengan 2 kolom.
+        const found = row.match(/\$\d+/g);
+        expect(found).toHaveLength(columns.length);
+        // `id_penyakit` ($1) boleh dan harus muncul di setiap tuple.
+        expect(found[0]).toBe("$1");
+      });
+
+      // Setiap parameter harus terpakai dan tidak ada placeholder di luar jangkauan.
+      const used = [...new Set(tuples.match(/\$\d+/g))];
+      expect(used).toEqual(params.map((_, i) => `$${i + 1}`));
+    });
+
+    it("harus 403 saat menyimpan referensi sebagai role user", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .post("/api/penyakit")
+        .set("Authorization", `Bearer ${signToken({ role: "user" })}`)
+        .send({ ...basePayload, referensi: ["https://example.com"] });
+
+      expect(res.status).toBe(403);
+      expect(callsMatching(/FROM referensi/)).toHaveLength(0);
+    });
+
+    it("harus 401 tanpa token JWT", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .post("/api/penyakit")
+        .send({ ...basePayload, referensi: ["https://example.com"] });
+
+      expect(res.status).toBe(401);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+  });
+
+  // --- REFERENSI VIA ENDPOINT KHUSUS (dari editor artikel) ---
+  describe("Referensi pada endpoint khusus /penyakit/:id/referensi", () => {
+    const adminAuth = { Authorization: `Bearer ${signToken({ role: "admin" })}` };
+
+    const stubAllQueries = () => mockQuery.mockResolvedValue(ok([{ id: 7 }]));
+    const callsMatching = (pattern) =>
+      mockQuery.mock.calls.filter(([sql]) => pattern.test(sql));
+
+    it("harus menyimpan referensi tanpa menanyakan field penyakit", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7/referensi")
+        .set(adminAuth)
+        .send({ referensi: ["https://id.wikipedia.org/wiki/Maag"] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.referensi).toEqual(["https://id.wikipedia.org/wiki/Maag"]);
+      const ins = callsMatching(/INSERT INTO referensi/);
+      expect(ins).toHaveLength(1);
+      expect(ins[0][1]).toEqual([7, "https://id.wikipedia.org/wiki/Maag"]);
+    });
+
+    // Ini regresi untuk desain endpoint: form penyakit mewajibkan nama/slug/
+    // tingkat_urgensi/id_sistem_tubuh/bagian_tubuhIds, sedangkan editor
+    // artikel tidak memegang data itu.
+    it("harus tidak menolak payload yang hanya berisi referensi", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7/referensi")
+        .set(adminAuth)
+        .send({ referensi: [] });
+
+      expect(res.status).toBe(200);
+    });
+
+    it("harus tidak menimpa kolom penyakit apa pun", async () => {
+      stubAllQueries();
+      await request(app)
+        .put("/api/penyakit/7/referensi")
+        .set(adminAuth)
+        .send({ referensi: ["https://example.com"] });
+
+      expect(callsMatching(/UPDATE penyakit/i)).toHaveLength(0);
+    });
+
+    it("harus menghapus semua referensi saat dikirim array kosong", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7/referensi")
+        .set(adminAuth)
+        .send({ referensi: [] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.referensi).toEqual([]);
+      expect(callsMatching(/DELETE FROM referensi/)).toHaveLength(1);
+      expect(callsMatching(/INSERT INTO referensi/)).toHaveLength(0);
+    });
+
+    it("harus menolak referensi yang bukan array dengan 400", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7/referensi")
+        .set(adminAuth)
+        .send({ referensi: "https://example.com" });
+
+      expect(res.status).toBe(400);
+      expect(callsMatching(/FROM referensi/)).toHaveLength(0);
+    });
+
+    it("harus menolak URL bukan http/https dengan 400 tanpa menulis apa pun", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7/referensi")
+        .set(adminAuth)
+        .send({ referensi: ["javascript:alert(1)"] });
+
+      expect(res.status).toBe(400);
+      expect(callsMatching(/DELETE FROM referensi/)).toHaveLength(0);
+      expect(callsMatching(/INSERT INTO referensi/)).toHaveLength(0);
+    });
+
+    it("harus menolak lebih dari 50 referensi dengan 400", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7/referensi")
+        .set(adminAuth)
+        .send({
+          referensi: Array.from({ length: 51 }, (_, i) => `https://example.com/s/${i}`),
+        });
+
+      expect(res.status).toBe(400);
+      expect(callsMatching(/INSERT INTO referensi/)).toHaveLength(0);
+    });
+
+    it("harus 400 saat id penyakit tidak ada", async () => {
+      mockQuery.mockResolvedValue(ok([]));
+      const res = await request(app)
+        .put("/api/penyakit/9999/referensi")
+        .set(adminAuth)
+        .send({ referensi: ["https://example.com"] });
+
+      expect(res.status).toBe(400);
+      expect(callsMatching(/DELETE FROM referensi/)).toHaveLength(0);
+    });
+
+    it("harus 400 saat id penyakit bukan angka", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/abc/referensi")
+        .set(adminAuth)
+        .send({ referensi: ["https://example.com"] });
+
+      expect(res.status).toBe(400);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("harus 403 saat role user", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7/referensi")
+        .set("Authorization", `Bearer ${signToken({ role: "user" })}`)
+        .send({ referensi: ["https://example.com"] });
+
+      expect(res.status).toBe(403);
+      expect(callsMatching(/FROM referensi/)).toHaveLength(0);
+    });
+
+    it("harus 401 tanpa token JWT", async () => {
+      stubAllQueries();
+      const res = await request(app)
+        .put("/api/penyakit/7/referensi")
+        .send({ referensi: ["https://example.com"] });
+
+      expect(res.status).toBe(401);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+  });
+
   // --- ROUTE DUPLIKAT TANPA PREFIX SUDAH DIHAPUS ---
   describe("Route tanpa prefix /api", () => {
     it("harus 404 pada /auth/register (prefix tidak lagi dilayani di path root)", async () => {
