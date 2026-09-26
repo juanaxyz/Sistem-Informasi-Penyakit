@@ -381,7 +381,7 @@ export function DiseaseDetailPage() {
           </div>
         </article>
         <FadeIn delay={0.15}>
-          <aside className="lg:sticky lg:top-20">
+          <aside className="order-first lg:order-none lg:sticky lg:top-20">
             <BodyPartPreview ids={data.bagian_tubuh.map((part) => part.id)} />
           </aside>
         </FadeIn>

@@ -99,11 +99,11 @@ function OverlayContent({
   };
 
   const inputClass =
-    "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "w-full rounded-lg border border-border bg-background px-3 py-2 text-base sm:text-sm text-ink placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
   return (
     <motion.aside
-      className="fixed inset-y-0 right-0 z-99 flex w-full max-w-sm flex-col border-l border-border bg-background shadow-2xl"
+      className="fixed inset-y-0 right-0 z-99 flex w-full max-w-sm flex-col overflow-y-auto overscroll-contain border-l border-border bg-background shadow-2xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
       initial={{ x: "100%" }}
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
@@ -272,7 +272,7 @@ function OverlayContent({
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-3 bg-background">
+      <nav className="shrink-0 p-3 bg-background">
         <ul className="space-y-1">
           {menuItems.map((item) => (
             <li key={item.to}>

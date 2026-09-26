@@ -124,9 +124,16 @@ export default function Dock({
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
 
+  const canHover = useMemo(
+    () => typeof window !== "undefined" && window.matchMedia("(hover: hover)").matches,
+    [],
+  );
+  const magnify = canHover ? magnification : baseItemSize;
+  const effDistance = canHover ? distance : 0;
+
   const maxHeight = useMemo(
-    () => Math.max(dockHeight, magnification + magnification / 2 + 4),
-    [magnification, dockHeight],
+    () => Math.max(dockHeight, magnify + magnify / 2 + 4),
+    [magnify, dockHeight],
   );
   const heightRow = useTransform(isHovered, [0, 1], [panelHeight, maxHeight]);
   const height = useSpring(heightRow, spring);
@@ -138,6 +145,7 @@ export default function Dock({
     >
       <motion.div
         onMouseMove={({ pageX }) => {
+          if (!canHover) return;
           isHovered.set(1);
           mouseX.set(pageX);
         }}
@@ -157,8 +165,8 @@ export default function Dock({
             className={item.className}
             mouseX={mouseX}
             spring={spring}
-            distance={distance}
-            magnification={magnification}
+            distance={effDistance}
+            magnification={magnify}
             baseItemSize={baseItemSize}
             label={item.label}
             active={item.active}

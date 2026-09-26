@@ -939,7 +939,7 @@ export default function Admin() {
                         value={penyakitForm.nama}
                         onChange={(e) => setPenyakitForm({ ...penyakitForm, nama: e.target.value })}
                         placeholder="Contoh: Tuberkulosis (TBC)"
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                       />
                     </div>
 
@@ -953,7 +953,7 @@ export default function Admin() {
                         value={penyakitForm.slug}
                         onChange={(e) => setPenyakitForm({ ...penyakitForm, slug: e.target.value })}
                         placeholder="contoh: tuberkulosis"
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                       />
                     </div>
 
@@ -965,7 +965,7 @@ export default function Admin() {
                         required
                         value={penyakitForm.id_sistem_tubuh}
                         onChange={(e) => setPenyakitForm({ ...penyakitForm, id_sistem_tubuh: Number(e.target.value) })}
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                       >
                         <option value="">Pilih Sistem Organ</option>
                         {sistemTubuhList.map((s) => (
@@ -983,7 +983,7 @@ export default function Admin() {
                       <select
                         value={penyakitForm.tingkat_urgensi}
                         onChange={(e) => setPenyakitForm({ ...penyakitForm, tingkat_urgensi: e.target.value as UrgencyLevel })}
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                       >
                         <option value="normal">Normal (Konsultasi rutin)</option>
                         <option value="waspada">Waspada (Butuh perhatian)</option>
@@ -1000,7 +1000,7 @@ export default function Admin() {
                         value={penyakitForm.code}
                         onChange={(e) => setPenyakitForm({ ...penyakitForm, code: e.target.value })}
                         placeholder="Contoh: TBC, COVID_19"
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                       />
                     </div>
 
@@ -1013,7 +1013,7 @@ export default function Admin() {
                         value={penyakitForm.thumbnail}
                         onChange={(e) => setPenyakitForm({ ...penyakitForm, thumbnail: e.target.value })}
                         placeholder="/images/penyakit/tbc.jpg"
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                       />
                     </div>
                   </div>
@@ -1027,7 +1027,7 @@ export default function Admin() {
                       value={penyakitForm.ringkasan}
                       onChange={(e) => setPenyakitForm({ ...penyakitForm, ringkasan: e.target.value })}
                       placeholder="Penjelasan ringkas 1-2 kalimat untuk kartu pencarian..."
-                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                     />
                   </div>
 
@@ -1249,7 +1249,7 @@ export default function Admin() {
                             value={b.judul || ""}
                             onChange={(e) => handleBagianChange(idx, "judul", e.target.value)}
                             placeholder="Contoh: Gejala Klinis, Pencegahan, dsb."
-                            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                           />
                         </div>
 
@@ -1260,7 +1260,7 @@ export default function Admin() {
                           <select
                             value={b.tipe || "lainnya"}
                             onChange={(e) => handleBagianChange(idx, "tipe", e.target.value)}
-                            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                           >
                             <option value="ringkasan">Ringkasan</option>
                             <option value="gejala">Gejala</option>
@@ -1422,7 +1422,7 @@ export default function Admin() {
                       placeholder="https://www.who.int/..."
                       aria-invalid={referensiError ? true : undefined}
                       aria-describedby={referensiError ? "referensi-error-artikel" : undefined}
-                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                     />
                     <Button
                       type="button"
@@ -1462,7 +1462,7 @@ export default function Admin() {
                                 }
                                 if (e.key === "Escape") handleCancelEditReferensi();
                               }}
-                              className="w-full bg-transparent text-sm text-ink outline-none"
+                              className="w-full bg-transparent text-base sm:text-sm text-ink outline-none"
                             />
                             <Button
                               type="button"
@@ -1709,7 +1709,7 @@ export default function Admin() {
                 value={patogenForm.nama}
                 onChange={(e) => setPatogenForm({ ...patogenForm, nama: e.target.value })}
                 placeholder="Contoh: Mycobacterium tuberculosis"
-                className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
               />
             </div>
 
@@ -1720,7 +1720,7 @@ export default function Admin() {
               <select
                 value={patogenForm.jenis}
                 onChange={(e) => setPatogenForm({ ...patogenForm, jenis: e.target.value })}
-                className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
               >
                 <option value="virus">Virus</option>
                 <option value="bakteri">Bakteri</option>
@@ -1739,7 +1739,7 @@ export default function Admin() {
                 value={patogenForm.deskripsi}
                 onChange={(e) => setPatogenForm({ ...patogenForm, deskripsi: e.target.value })}
                 placeholder="Penjelasan ringkas tentang patogen ini..."
-                className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
               />
             </div>
 

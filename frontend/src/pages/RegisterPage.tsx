@@ -102,7 +102,7 @@ export default function RegisterPage() {
                 autoComplete="name"
                 required
                 disabled={isSubmitting}
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base sm:text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
                 placeholder="Nama Anda"
               />
             </div>
@@ -122,7 +122,7 @@ export default function RegisterPage() {
                 autoComplete="email"
                 required
                 disabled={isSubmitting}
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base sm:text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
                 placeholder="nama@email.com"
               />
             </div>
@@ -142,7 +142,7 @@ export default function RegisterPage() {
                 autoComplete="username"
                 required
                 disabled={isSubmitting}
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base sm:text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
                 placeholder="username_anda"
               />
             </div>
@@ -162,7 +162,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 required
                 disabled={isSubmitting}
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base sm:text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
                 placeholder="Minimal 6 karakter"
               />
             </div>
@@ -182,7 +182,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 required
                 disabled={isSubmitting}
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base sm:text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
                 placeholder="Ulangi password"
               />
             </div>

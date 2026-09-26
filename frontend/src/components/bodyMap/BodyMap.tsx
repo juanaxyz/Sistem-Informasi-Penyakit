@@ -83,7 +83,7 @@ type BodyContainerProps = {
 };
 
 const BodyContainer = ({ children, imageSrc }: BodyContainerProps) => (
-  <div className="relative w-52.5 h-116.75 mx-auto">
+  <div className="relative mx-auto aspect-[375.42/832.97] w-full max-w-[20rem] md:max-w-none md:w-52.5">
     {imageSrc ? (
       <img
         src={imageSrc}
@@ -94,7 +94,7 @@ const BodyContainer = ({ children, imageSrc }: BodyContainerProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox={SVG_VIEWBOX}
-      className="relative w-full h-full block"
+      className="relative w-full h-full block touch-manipulation"
     >
       <g>{children}</g>
     </svg>
@@ -235,7 +235,7 @@ export const BodyMap = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
-              className="hidden hover:block max-w-[16rem] truncate rounded-full border border-border bg-background px-3 py-0.5 font-mono text-xs text-ink shadow-sm"
+              className="block max-w-[calc(100vw-3rem)] truncate rounded-full border border-border bg-background px-3 py-0.5 font-mono text-xs text-ink shadow-sm"
             >
               <span className="mr-1.5  w-1.5 h-1.5 rounded-full bg-pine align-middle " />
               {activeLabel}

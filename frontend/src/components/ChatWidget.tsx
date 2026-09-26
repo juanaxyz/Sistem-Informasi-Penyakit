@@ -105,7 +105,7 @@ export function ChatWidget() {
         aria-expanded={open}
         aria-controls="chat-widget-panel"
         aria-label={open ? "Tutup chat" : "Buka chat"}
-        className="fixed cursor-pointer bottom-4 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="fixed cursor-pointer bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {open ? (
           <X className="h-6 w-6" aria-hidden="true" />
@@ -120,7 +120,7 @@ export function ChatWidget() {
           role="dialog"
           aria-modal="false"
           aria-label="Chat asisten kesehatan"
-          className="fixed bottom-20 right-4 z-50 flex h-[28rem] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden rounded-lg border border-border bg-card shadow-xl"
+          className="fixed bottom-[max(5rem,env(safe-area-inset-bottom))] right-4 z-50 flex h-[min(28rem,calc(100dvh-6.5rem))] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden rounded-lg border border-border bg-card shadow-xl"
         >
           <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-4 py-3">
             <div className="flex items-center gap-2">
@@ -195,7 +195,7 @@ export function ChatWidget() {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Tulis pertanyaan..."
                 autoComplete="off"
-                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
               />
               <button
                 type="submit"

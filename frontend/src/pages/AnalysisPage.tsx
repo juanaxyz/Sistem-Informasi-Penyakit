@@ -60,7 +60,7 @@ function AnalysisSelectionModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 backdrop-blur-[2px]"
+        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/20 px-4 py-6 backdrop-blur-[2px]"
         onClick={onClose}
       >
         <motion.div
@@ -71,9 +71,9 @@ function AnalysisSelectionModal({
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
-          className="w-full max-w-md overflow-hidden rounded-3xl border border-border bg-white shadow-2xl"
+          className="my-auto flex max-h-[calc(100dvh-3rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-border bg-white shadow-2xl"
         >
-          <div className="flex items-start justify-between border-b border-border px-6 py-5">
+          <div className="flex shrink-0 items-start justify-between border-b border-border px-6 py-5">
             <div>
               <p className="text-xs font-medium uppercase tracking-widest text-pine/60">
                 Bagian tubuh
@@ -98,7 +98,7 @@ function AnalysisSelectionModal({
             </button>
           </div>
 
-          <div className="space-y-3 p-5">
+          <div className="space-y-3 overflow-y-auto p-5">
             {loading ? (
               <div className="flex h-24 items-center justify-center">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-pine border-t-transparent" />
@@ -139,7 +139,7 @@ function AnalysisSelectionModal({
             )}
           </div>
 
-          <div className="border-t border-border bg-mint/20 px-6 py-4">
+          <div className="shrink-0 border-t border-border bg-mint/20 px-6 py-4">
             <p className="text-center text-xs leading-relaxed text-muted-foreground">
               Informasi ini bersifat edukasi dan bukan diagnosis medis.
             </p>
@@ -273,7 +273,7 @@ function AnalyzePage({
       </header>
 
       <FadeIn delay={0.1}>
-        <ol className="mt-8 flex items-center justify-center">
+        <ol className="mt-8 flex flex-wrap items-center justify-center gap-y-2">
           {STEPS.map((step, i) => {
             const isDone = i < currentStep;
             const isActive = i === currentStep;
@@ -282,7 +282,7 @@ function AnalyzePage({
                 {i > 0 && (
                   <span
                     aria-hidden="true"
-                    className={`mx-2 h-px w-8 sm:w-12 ${
+                    className={`mx-1 h-px w-6 shrink-0 sm:w-12 ${
                       isDone ? "bg-pine" : "bg-border"
                     }`}
                   />
@@ -300,7 +300,7 @@ function AnalyzePage({
                     {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
                   </span>
                   <span
-                    className={`font-mono text-xs ${
+                    className={`whitespace-nowrap font-mono text-xs ${
                       isDone || isActive
                         ? "font-medium text-pine"
                         : "text-muted-foreground"

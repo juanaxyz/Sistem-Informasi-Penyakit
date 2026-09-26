@@ -60,7 +60,7 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-background font-sans">
+    <div className="min-h-[100dvh] bg-background font-sans">
       <SiteHeader />
 
       <main className="max-w-7xl mx-auto px-4 py-6 pb-28">
@@ -104,7 +104,7 @@ export default function App() {
         </Routes>
       </main>
 
-      <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
+      <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2">
         <Dock
           className="bg-background"
           items={items}
@@ -114,7 +114,7 @@ export default function App() {
         />
       </div>
 
-      <footer className="border-t border-border bg-muted/30 py-4">
+      <footer className="border-t border-border bg-muted/30 pt-4 pb-[max(5rem,env(safe-area-inset-bottom))] sm:py-4">
         <p className="max-w-7xl mx-auto px-4 text-center text-sm text-muted-foreground font-mono">
           Informasi ini bersifat edukasi, bukan diagnosis medis. Konsultasikan
           dengan tenaga kesehatan untuk penanganan yang tepat.

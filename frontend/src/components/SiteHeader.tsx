@@ -31,7 +31,7 @@ export function SiteHeader() {
                 className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-ink transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <UserIcon size={14} className="text-pine" />
-                <span>{user.nama}</span>
+                <span className="max-w-24 truncate">{user.nama}</span>
                 {user.role === "admin" && (
                   <span className="rounded bg-pine/10 px-1.5 py-0.2 text-[10px] font-mono text-pine">
                     Admin

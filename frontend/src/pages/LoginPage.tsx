@@ -86,7 +86,7 @@ try {
                 autoComplete="username"
                 required
                 disabled={isSubmitting}
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base sm:text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
                 placeholder="nama@email.com atau username"
               />
             </div>
@@ -106,7 +106,7 @@ try {
                 autoComplete="current-password"
                 required
                 disabled={isSubmitting}
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base sm:text-sm text-ink outline-none transition focus:border-pine focus:ring-1 focus:ring-pine disabled:opacity-50"
                 placeholder="••••••••"
               />
             </div>
