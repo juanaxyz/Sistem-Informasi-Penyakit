@@ -1,15 +1,14 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams, useNavigate } from "react-router-dom";
-import { api } from "@/lib/api";
+import { useParams } from "react-router-dom";
+import { api, resolveAssetUrl } from "@/lib/api";
 import { FadeIn } from "@/components/FadeIn";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AnalysisDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const riwayatId = parseInt(id, 10);
+  const riwayatId = id ? parseInt(id, 10) : Number.NaN;
   const queryClient = useQueryClient();
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -40,7 +39,7 @@ export default function AnalysisDetailPage() {
   };
 
   if (isLoading) return <FadeIn><div className="text-center py-8">Loading...</div></FadeIn>;
-  if (error) return <FadeIn><div className="text-center py-8">Error: {(error as any).message}</div></FadeIn>;
+  if (error) return <FadeIn><div className="text-center py-8">Error: {error.message}</div></FadeIn>;
 
   const riwayat = data?.riwayat;
   if (!riwayat) return <FadeIn><div className="text-center py-8">Riwayat tidak ditemukan</div></FadeIn>;
@@ -59,7 +58,7 @@ export default function AnalysisDetailPage() {
           {/* Gambar */}
           <div className="rounded-lg overflow-hidden border">
             <img
-              src={riwayat.gambar}
+              src={resolveAssetUrl(riwayat.gambar)}
               alt="Gambar X-ray"
               className="w-full h-96 object-contain"
               onError={(e) => {

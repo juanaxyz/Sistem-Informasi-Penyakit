@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { FadeIn } from "@/components/FadeIn";
+import Dashboard from "./AdminDashboard";
 import { BodyMap } from "@/components/bodyMap/BodyMap";
-import type { UrgencyLevel, BodyPartRecord, SystemRecord, ArtikelBagian } from "@/lib/types";
+import type { UrgencyLevel, BodyPartRecord, SystemRecord, ArtikelBagian, Patogen, PenyakitFormPayload } from "@/lib/types";
 
 interface PenyakitListItem {
   id: number;
@@ -38,15 +39,31 @@ export default function Admin() {
   const [artikelList, setArtikelList] = useState<ArtikelListItem[]>([]);
   const [sistemTubuhList, setSistemTubuhList] = useState<SystemRecord[]>([]);
   const [bodyPartList, setBodyPartList] = useState<BodyPartRecord[]>([]);
+  const [patogenList, setPatogenList] = useState<Patogen[]>([]);
   
   // Selection & Mode
-  const [editMode, setEditMode] = useState<"penyakit" | "artikel" | null>(null);
+  const [editMode, setEditMode] = useState<"penyakit" | "artikel" | "patogen" | null>(null);
   const [selectedPenyakit, setSelectedPenyakit] = useState<PenyakitListItem | null>(null);
   const [selectedArtikel, setSelectedArtikel] = useState<ArtikelListItem | null>(null);
+
+  // Patogen editor modal state
+  const [showPatogenModal, setShowPatogenModal] = useState(false);
+  const patogenModalRef = useRef<HTMLDialogElement>(null);
+  const [editingPatogen, setEditingPatogen] = useState<Patogen | null>(null);
+  const [patogenForm, setPatogenForm] = useState({
+    nama: "",
+    jenis: "virus",
+    deskripsi: "",
+    penyakitIds: [] as number[],
+  });
 
   // Modal state for penyakit form
   const [showPenyakitModal, setShowPenyakitModal] = useState(false);
   const penyakitModalRef = useRef<HTMLDialogElement>(null);
+
+  // Modal state for buat artikel
+  const [showArtikelModal, setShowArtikelModal] = useState(false);
+  const artikelModalRef = useRef<HTMLDialogElement>(null);
   
   // Penyakit Form State
   const [penyakitForm, setPenyakitForm] = useState<{
@@ -58,6 +75,7 @@ export default function Admin() {
     id_sistem_tubuh: number | "";
     code: string;
     bagian_tubuhIds: number[];
+    patogenIds: number[];
   }>({
     nama: "",
     slug: "",
@@ -67,6 +85,7 @@ export default function Admin() {
     id_sistem_tubuh: "",
     code: "",
     bagian_tubuhIds: [],
+    patogenIds: [],
   });
 
   // Artikel Multi-Bagian State
@@ -79,6 +98,9 @@ export default function Admin() {
 
   const openPenyakitModal = () => setShowPenyakitModal(true);
   const closePenyakitModal = () => setShowPenyakitModal(false);
+
+  const openArtikelModal = () => setShowArtikelModal(true);
+  const closeArtikelModal = () => setShowArtikelModal(false);
 
   // Helper untuk memuat daftar penyakit (all atau fallback ke pencarian)
   const loadPenyakitList = async (): Promise<PenyakitListItem[]> => {
@@ -98,16 +120,18 @@ export default function Admin() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [penyakitList, artikelRes, sistemRes, bodyPartsRes] = await Promise.all([
+      const [penyakitList, artikelRes, sistemRes, bodyPartsRes, patogenRes] = await Promise.all([
         loadPenyakitList(),
         api.getArtikelList(),
         api.getSistemTubuh(),
         api.getBodyParts(),
+        api.patogen.list(),
       ]);
       setPenyakitList(penyakitList);
       setArtikelList(artikelRes.artikel || []);
       setSistemTubuhList(sistemRes.sistem_tubuh || []);
       setBodyPartList(bodyPartsRes.bagian_tubuh || []);
+      setPatogenList(patogenRes.patogen || []);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -137,6 +161,26 @@ export default function Admin() {
     }
   }, [showPenyakitModal]);
 
+  useEffect(() => {
+    const dialog = artikelModalRef.current;
+    if (!dialog) return;
+    if (showArtikelModal && !dialog.open) {
+      dialog.showModal();
+    } else if (!showArtikelModal && dialog.open) {
+      dialog.close();
+    }
+  }, [showArtikelModal]);
+
+  useEffect(() => {
+    const dialog = patogenModalRef.current;
+    if (!dialog) return;
+    if (showPatogenModal && !dialog.open) {
+      dialog.showModal();
+    } else if (!showPatogenModal && dialog.open) {
+      dialog.close();
+    }
+  }, [showPatogenModal]);
+
   // --- HANDLER PENYAKIT ---
   const handleNewPenyakit = () => {
     setSelectedPenyakit(null);
@@ -149,6 +193,7 @@ export default function Admin() {
       id_sistem_tubuh: sistemTubuhList[0]?.id || "",
       code: "",
       bagian_tubuhIds: [],
+      patogenIds: [],
     });
     setError(null);
     setSuccess(null);
@@ -172,6 +217,7 @@ export default function Admin() {
         id_sistem_tubuh: p.id_sistem_tubuh,
         code: (p as PenyakitListItem).code ?? "",
         bagian_tubuhIds: (p.bagian_tubuh || []).map((b) => b.id),
+        patogenIds: (p.patogen || []).map((pg) => pg.id),
       });
       openPenyakitModal();
     } catch (err) {
@@ -194,6 +240,18 @@ export default function Admin() {
     });
   };
 
+  const handleTogglePatogen = (id: number) => {
+    setPenyakitForm((prev) => {
+      const exists = prev.patogenIds.includes(id);
+      return {
+        ...prev,
+        patogenIds: exists
+          ? prev.patogenIds.filter((item) => item !== id)
+          : [...prev.patogenIds, id],
+      };
+    });
+  };
+
   const handleSavePenyakit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!penyakitForm.nama || !penyakitForm.slug || !penyakitForm.id_sistem_tubuh) {
@@ -205,11 +263,22 @@ export default function Admin() {
     setError(null);
     setSuccess(null);
     try {
+      const payload: PenyakitFormPayload = {
+        nama: penyakitForm.nama,
+        slug: penyakitForm.slug,
+        ringkasan: penyakitForm.ringkasan || null,
+        thumbnail: penyakitForm.thumbnail || null,
+        tingkat_urgensi: penyakitForm.tingkat_urgensi,
+        id_sistem_tubuh: Number(penyakitForm.id_sistem_tubuh),
+        code: penyakitForm.code || null,
+        bagian_tubuhIds: penyakitForm.bagian_tubuhIds,
+        patogenIds: penyakitForm.patogenIds,
+      };
       if (selectedPenyakit) {
-        await api.updatePenyakit(selectedPenyakit.id, penyakitForm);
+        await api.updatePenyakit(selectedPenyakit.id, payload);
         setSuccess("Penyakit berhasil diperbarui");
       } else {
-        await api.createPenyakit(penyakitForm);
+        await api.createPenyakit(payload);
         setSuccess("Penyakit baru berhasil ditambahkan");
       }
       // Refresh list
@@ -251,6 +320,153 @@ export default function Admin() {
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError("Gagal memuat bagian artikel");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- LOM PAT KE ARTIKEL DARI PENYAKIT ---
+  const handleOpenArtikelForPenyakit = (penyakit: PenyakitListItem) => {
+    const artikel = artikelList.find((a) => a.id_penyakit === penyakit.id);
+    if (artikel) {
+      handleSelectArtikel(artikel);
+    } else {
+      handleCreateArtikel(penyakit);
+    }
+  };
+
+  // --- HANDLER PATOGEN ---
+  const openPatogenModal = () => setShowPatogenModal(true);
+  const closePatogenModal = () => setShowPatogenModal(false);
+
+  const loadPatogenList = async () => {
+    const res = await api.patogen.list();
+    setPatogenList(res.patogen || []);
+  };
+
+  const handleNewPatogen = () => {
+    setEditingPatogen(null);
+    setPatogenForm({ nama: "", jenis: "virus", deskripsi: "", penyakitIds: [] });
+    setError(null);
+    setSuccess(null);
+    openPatogenModal();
+  };
+
+  const handleEditPatogen = async (pg: Patogen) => {
+    setEditingPatogen(pg);
+    setPatogenForm({
+      nama: pg.nama,
+      jenis: pg.jenis,
+      deskripsi: pg.deskripsi ?? "",
+      penyakitIds: [],
+    });
+    setError(null);
+    setSuccess(null);
+    try {
+      const { patogen } = await api.patogen.detail(pg.id);
+      setPatogenForm({
+        nama: patogen.nama,
+        jenis: patogen.jenis,
+        deskripsi: patogen.deskripsi ?? "",
+        penyakitIds: (patogen.penyakit || []).map((d) => d.id),
+      });
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+      else setError("Gagal memuat detail patogen");
+    }
+    openPatogenModal();
+  };
+
+  const handleTogglePatogenPenyakit = (id: number) => {
+    setPatogenForm((prev) => {
+      const exists = prev.penyakitIds.includes(id);
+      return {
+        ...prev,
+        penyakitIds: exists
+          ? prev.penyakitIds.filter((item) => item !== id)
+          : [...prev.penyakitIds, id],
+      };
+    });
+  };
+
+  const handleSavePatogen = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patogenForm.nama.trim()) {
+      setError("Nama patogen wajib diisi");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      if (editingPatogen) {
+        await api.patogen.update(editingPatogen.id, patogenForm);
+        setSuccess("Patogen berhasil diperbarui");
+      } else {
+        await api.patogen.create(patogenForm);
+        setSuccess("Patogen baru berhasil ditambahkan");
+      }
+      await loadPatogenList();
+      setEditingPatogen(null);
+      closePatogenModal();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+      else setError("Gagal menyimpan patogen");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePatogen = async (pg: Patogen) => {
+    if (!window.confirm(`Hapus patogen "${pg.nama}"?`)) return;
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await api.patogen.remove(pg.id);
+      setPatogenList((prev) => prev.filter((p) => p.id !== pg.id));
+      setSuccess(`Patogen "${pg.nama}" dihapus`);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+      else setError("Gagal menghapus patogen");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- BUAT ARTIKEL BARU ---
+  const handleNewArtikel = () => {
+    setError(null);
+    setSuccess(null);
+    openArtikelModal();
+  };
+
+  const handleCreateArtikel = async (penyakit: PenyakitListItem) => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await api.createArtikel(penyakit.id);
+      const artikel = res.artikel;
+      // Refresh list
+      const artikelRes = await api.getArtikelList();
+      setArtikelList(artikelRes.artikel || []);
+      closeArtikelModal();
+      // Langsung masuk editor artikel baru
+      setSelectedArtikel(artikel as ArtikelListItem);
+      setEditMode("artikel");
+      setBagianList([
+        {
+          id_artikel: artikel.id,
+          judul: "Pengertian & Ringkasan",
+          konten: "",
+          tipe: "ringkasan",
+          urutan: 1,
+        },
+      ]);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+      else setError("Gagal membuat artikel");
     } finally {
       setLoading(false);
     }
@@ -336,6 +552,20 @@ export default function Admin() {
 
             <nav className="flex flex-col gap-1">
               <Button
+                variant={editMode === null ? "secondary" : "ghost"}
+                size="sm"
+                className="justify-start font-medium"
+                onClick={() => {
+                  setEditMode(null);
+                  setSelectedPenyakit(null);
+                  setSelectedArtikel(null);
+                  setError(null);
+                  setSuccess(null);
+                }}
+              >
+                Ringkasan
+              </Button>
+              <Button
                 variant={editMode === "penyakit" ? "secondary" : "ghost"}
                 size="sm"
                 className="justify-start font-medium"
@@ -360,6 +590,18 @@ export default function Admin() {
                 }}
               >
                 Edukasi & Artikel
+              </Button>
+              <Button
+                variant={editMode === "patogen" ? "secondary" : "ghost"}
+                size="sm"
+                className="justify-start font-medium"
+                onClick={() => {
+                  setEditMode("patogen");
+                  setError(null);
+                  setSuccess(null);
+                }}
+              >
+                Daftar Patogen
               </Button>
             </nav>
           </aside>
@@ -393,24 +635,41 @@ export default function Admin() {
                 </div>
 
                 <div className="grid gap-2">
-                  {penyakitList.map((p) => (
-                    <div
-                      key={p.id}
-                      onClick={() => handleSelectPenyakit(p)}
-                      className="flex items-center justify-between p-3.5 rounded-lg border border-border/60 hover:border-pine/40 hover:bg-muted/30 cursor-pointer transition"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium text-ink text-sm">{p.nama}</h4>
-                          <span className="text-xs font-mono text-muted-foreground">({p.slug})</span>
+                  {penyakitList.map((p) => {
+                    const hasArtikel = artikelList.some((a) => a.id_penyakit === p.id);
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => handleSelectPenyakit(p)}
+                        className="flex items-center justify-between gap-3 p-3.5 rounded-lg border border-border/60 hover:border-pine/40 hover:bg-muted/30 cursor-pointer transition"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-ink text-sm">{p.nama}</h4>
+                            <span className="text-xs font-mono text-muted-foreground">({p.slug})</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Sistem: {p.sistem_tubuh_nama || p.sistem_tubuh?.nama || "-"}
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Sistem: {p.sistem_tubuh_nama || p.sistem_tubuh?.nama || "-"}
-                        </p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenArtikelForPenyakit(p);
+                            }}
+                            title={hasArtikel ? "Buka artikel penyakit ini" : "Buat artikel untuk penyakit ini"}
+                            className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-ink transition hover:border-pine/40 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${hasArtikel ? "bg-pine" : "bg-muted-foreground/50"}`} />
+                            Artikel{hasArtikel ? " (Ada)" : " (+)"}
+                          </button>
+                          <UrgencyBadge disease={{ tingkat_urgensi: p.tingkat_urgensi }} />
+                        </div>
                       </div>
-                      <UrgencyBadge disease={{ tingkat_urgensi: p.tingkat_urgensi }} />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -542,6 +801,77 @@ export default function Admin() {
                     />
                   </div>
 
+                  {/* Relasi Patogen — Multi-Select */}
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+                      Patogen Penyebab — pilih lebih dari satu
+                    </label>
+                    <div className="grid gap-3 md:grid-cols-[1fr_1fr] md:items-start">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Daftar patogen ({patogenList.length}):
+                        </p>
+                        {patogenList.length === 0 ? (
+                          <p className="text-xs text-muted-foreground italic">
+                            Belum ada patogen. Tambahkan lewat menu "Daftar Patogen".
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto">
+                            {patogenList.map((pg) => {
+                              const selected = penyakitForm.patogenIds.includes(pg.id);
+                              return (
+                                <button
+                                  key={pg.id}
+                                  type="button"
+                                  onClick={() => handleTogglePatogen(pg.id)}
+                                  aria-pressed={selected}
+                                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine ${
+                                    selected
+                                      ? "border-pine/40 bg-pine/10 text-pine hover:bg-pine/20"
+                                      : "border-border bg-background text-muted-foreground hover:border-pine/40 hover:text-ink"
+                                  }`}
+                                >
+                                  {selected && <span aria-hidden="true">✓</span>}
+                                  {pg.nama}
+                                  <span className="font-mono text-[10px] text-muted-foreground">
+                                    {pg.jenis}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Dipilih ({penyakitForm.patogenIds.length}):
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto">
+                          {penyakitForm.patogenIds.length === 0 ? (
+                            <span className="text-xs text-muted-foreground italic">
+                              Belum ada patogen dipilih.
+                            </span>
+                          ) : (
+                            patogenList
+                              .filter((pg) => penyakitForm.patogenIds.includes(pg.id))
+                              .map((pg) => (
+                                <button
+                                  key={pg.id}
+                                  type="button"
+                                  onClick={() => handleTogglePatogen(pg.id)}
+                                  className="inline-flex items-center gap-1 rounded-full border border-pine/30 bg-pine/10 px-2.5 py-1 text-xs text-pine hover:bg-pine/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+                                >
+                                  {pg.nama}
+                                  <span aria-hidden="true">×</span>
+                                </button>
+                              ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+
                   {/* Relasi Bagian Tubuh — Body Map Multi-Select */}
                   <div>
                     <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
@@ -587,6 +917,8 @@ export default function Admin() {
                     </div>
                   </div>
 
+                  
+
                   <div className="flex justify-end gap-3 pt-4 border-t border-border">
                     <Button type="button" variant="outline" onClick={closePenyakitModal}>
                       Batal
@@ -604,9 +936,14 @@ export default function Admin() {
             {/* ======================================================== */}
             {editMode === "artikel" && !selectedArtikel && (
               <div>
-                <div className="mb-6 pb-3 border-b border-border">
-                  <h3 className="font-display text-xl text-ink font-semibold">Daftar Konten Artikel</h3>
-                  <p className="text-xs text-muted-foreground">Kelola struktur seksi edukasi, gejala, penanganan per penyakit</p>
+                <div className="flex items-center justify-between mb-6 pb-3 border-b border-border">
+                  <div>
+                    <h3 className="font-display text-xl text-ink font-semibold">Daftar Konten Artikel</h3>
+                    <p className="text-xs text-muted-foreground">Kelola struktur seksi edukasi, gejala, penanganan per penyakit</p>
+                  </div>
+                  <Button onClick={handleNewArtikel} className="bg-pine text-white hover:bg-pine/90 text-xs" disabled={loading}>
+                    + Tambah Artikel
+                  </Button>
                 </div>
 
                 <div className="grid gap-2">
@@ -752,18 +1089,279 @@ export default function Admin() {
               </form>
             )}
 
-            {/* Empty landing state */}
-            {!editMode && (
-              <div className="text-center py-16">
-                <h2 className="font-display text-2xl text-ink font-semibold">Selamat Datang di Panel Manajemen</h2>
-                <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-                  Pilih menu di samping untuk mengelola katalog penyakit, menghubungkan sistem dan bagian tubuh, atau mengedit artikel edukasi.
-                </p>
+            {/* Empty landing state -> Dashboard */}
+            {!editMode && <Dashboard />}
+
+            {/* ======================================================== */}
+            {/* DOMAIN PATOGEN */}
+            {/* ======================================================== */}
+            {editMode === "patogen" && (
+              <div>
+                <div className="flex items-center justify-between mb-6 pb-3 border-b border-border">
+                  <div>
+                    <h3 className="font-display text-xl text-ink font-semibold">Daftar Patogen</h3>
+                    <p className="text-xs text-muted-foreground">Kelola mikroorganisme penyebab penyakit (virus, bakteri, jamur, parasit)</p>
+                  </div>
+                  <Button onClick={handleNewPatogen} className="bg-pine text-white hover:bg-pine/90 text-xs" disabled={loading}>
+                    + Tambah Patogen
+                  </Button>
+                </div>
+
+                {patogenList.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic py-8 text-center">
+                    Belum ada patogen. Mulai dengan menambah patogen pertama.
+                  </p>
+                ) : (
+                  <div className="grid gap-2">
+                    {patogenList.map((pg) => (
+                      <div
+                        key={pg.id}
+                        className="flex items-center justify-between gap-3 p-3.5 rounded-lg border border-border/60 hover:border-pine/40 hover:bg-muted/30 transition"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-ink text-sm">{pg.nama}</h4>
+                            <Badge variant="outline" className="font-mono text-[10px] uppercase">
+                              {pg.jenis}
+                            </Badge>
+                          </div>
+                          {pg.deskripsi && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                              {pg.deskripsi}
+                            </p>
+                          )}
+                          {typeof pg.jumlah_penyakit === "number" && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Terkait {pg.jumlah_penyakit} penyakit
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditPatogen(pg)}
+                            className="h-8 px-2.5 text-xs"
+                            disabled={loading}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeletePatogen(pg)}
+                            disabled={loading}
+                            className="h-8 px-2.5 text-xs text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            Hapus
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </main>
         </div>
       </FadeIn>
+
+      {/* Modal pilih penyakit untuk artikel baru */}
+      <dialog
+        ref={artikelModalRef}
+        onClose={closeArtikelModal}
+        onCancel={(e) => { e.preventDefault(); closeArtikelModal(); }}
+        className="m-auto w-[min(92vw,32rem)] max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-background p-0 shadow-2xl backdrop:bg-black/40 backdrop:backdrop-blur-sm"
+      >
+        {showArtikelModal && (
+          <div className="p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h3 className="font-display text-xl text-ink font-semibold">Tambah Artikel Edukasi</h3>
+              <Button type="button" variant="ghost" size="sm" onClick={closeArtikelModal}>
+                Tutup
+              </Button>
+            </div>
+
+            <p className="mt-4 text-xs text-muted-foreground">
+              Pilih penyakit yang belum memiliki artikel.
+            </p>
+
+            <div className="mt-4 space-y-2">
+              {penyakitList.filter((p) => !artikelList.some((a) => a.id_penyakit === p.id)).length === 0 && (
+                <p className="text-sm text-muted-foreground italic py-4 text-center">
+                  Semua penyakit sudah memiliki artikel.
+                </p>
+              )}
+              {penyakitList
+                .filter((p) => !artikelList.some((a) => a.id_penyakit === p.id))
+                .map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleCreateArtikel(p)}
+                    disabled={loading}
+                    className="w-full flex items-center justify-between p-3.5 rounded-lg border border-border/60 hover:border-pine/40 hover:bg-muted/30 text-left cursor-pointer transition disabled:opacity-50"
+                  >
+                    <div>
+                      <h4 className="font-medium text-ink text-sm">{p.nama}</h4>
+                      <p className="text-xs font-mono text-muted-foreground mt-0.5">{p.slug}</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs">Buat Artikel</Badge>
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
+      </dialog>
+
+      {/* Modal Tambah/Edit Patogen */}
+      <dialog
+        ref={patogenModalRef}
+        onClose={closePatogenModal}
+        onCancel={(e) => { e.preventDefault(); closePatogenModal(); }}
+        className="m-auto w-[min(92vw,32rem)] max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-background p-0 shadow-2xl backdrop:bg-black/40 backdrop:backdrop-blur-sm"
+      >
+        {showPatogenModal && (
+          <form onSubmit={handleSavePatogen} className="p-6 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h3 className="font-display text-xl text-ink font-semibold">
+                {editingPatogen ? `Edit Patogen: ${editingPatogen.nama}` : "Tambah Patogen Baru"}
+              </h3>
+              <Button type="button" variant="ghost" size="sm" onClick={closePatogenModal}>
+                Tutup
+              </Button>
+            </div>
+
+            {error && (
+              <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                Nama Patogen *
+              </label>
+              <input
+                type="text"
+                required
+                value={patogenForm.nama}
+                onChange={(e) => setPatogenForm({ ...patogenForm, nama: e.target.value })}
+                placeholder="Contoh: Mycobacterium tuberculosis"
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                Jenis
+              </label>
+              <select
+                value={patogenForm.jenis}
+                onChange={(e) => setPatogenForm({ ...patogenForm, jenis: e.target.value })}
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+              >
+                <option value="virus">Virus</option>
+                <option value="bakteri">Bakteri</option>
+                <option value="jamur">Jamur</option>
+                <option value="parasit">Parasit</option>
+                <option value="lainnya">Lainnya</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                Deskripsi
+              </label>
+              <textarea
+                rows={3}
+                value={patogenForm.deskripsi}
+                onChange={(e) => setPatogenForm({ ...patogenForm, deskripsi: e.target.value })}
+                placeholder="Penjelasan ringkas tentang patogen ini..."
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+              />
+            </div>
+
+            {/* Relasi Penyakit — Multi-Select */}
+            <div>
+              <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+                Penyakit yang Disebabkan — pilih lebih dari satu
+              </label>
+              <div className="grid gap-3 md:grid-cols-[1fr_1fr] md:items-start">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Daftar penyakit ({penyakitList.length}):
+                  </p>
+                  {penyakitList.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">
+                      Belum ada penyakit.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5 max-h-52 overflow-y-auto">
+                      {penyakitList.map((d) => {
+                        const selected = patogenForm.penyakitIds.includes(d.id);
+                        return (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => handleTogglePatogenPenyakit(d.id)}
+                            aria-pressed={selected}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine ${
+                              selected
+                                ? "border-pine/40 bg-pine/10 text-pine hover:bg-pine/20"
+                                : "border-border bg-background text-muted-foreground hover:border-pine/40 hover:text-ink"
+                            }`}
+                          >
+                            {selected && <span aria-hidden="true">✓</span>}
+                            {d.nama}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Dipilih ({patogenForm.penyakitIds.length}):
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 max-h-52 overflow-y-auto">
+                    {patogenForm.penyakitIds.length === 0 ? (
+                      <span className="text-xs text-muted-foreground italic">
+                        Belum ada penyakit dipilih.
+                      </span>
+                    ) : (
+                      penyakitList
+                        .filter((d) => patogenForm.penyakitIds.includes(d.id))
+                        .map((d) => (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => handleTogglePatogenPenyakit(d.id)}
+                            className="inline-flex items-center gap-1 rounded-full border border-pine/30 bg-pine/10 px-2.5 py-1 text-xs text-pine hover:bg-pine/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+                          >
+                            {d.nama}
+                            <span aria-hidden="true">×</span>
+                          </button>
+                        ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
+              <Button type="button" variant="outline" onClick={closePatogenModal}>
+                Batal
+              </Button>
+              <Button type="submit" disabled={loading} className="bg-pine text-white hover:bg-pine/90">
+                {loading ? "Menyimpan..." : "Simpan Patogen"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </dialog>
     </div>
   );
 }

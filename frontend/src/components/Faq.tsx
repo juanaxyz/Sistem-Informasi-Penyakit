@@ -35,7 +35,7 @@ export default function Faq() {
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground text-pretty">
           Jawaban singkat seputar peta tubuh interaktif, pencarian penyakit,
-          dan layanan analisis X-Ray.
+          dan layanan analisis gambar.
         </p>
       </header>
 

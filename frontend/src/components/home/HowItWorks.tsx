@@ -14,7 +14,7 @@ const STEPS = [
   {
     nomor: "03",
     judul: "Analyze",
-    deskripsi: "Use AI to analyze X-Ray",
+    deskripsi: "Use AI to analyze images",
   },
 ];
 

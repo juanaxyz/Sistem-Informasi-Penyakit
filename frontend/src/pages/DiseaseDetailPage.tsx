@@ -178,6 +178,23 @@ export function DiseaseDetailPage() {
                   {data.ringkasan}
                 </p>
               )}
+              {data.patogen && data.patogen.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {data.patogen.map((pg) => (
+                    <Link
+                      key={pg.id}
+                      to={`/patogen/${pg.id}`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-ink transition hover:border-pine/40 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="h-2 w-2 rounded-full bg-pine"
+                      />
+                      {pg.nama}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </header>
           </FadeIn>
           {data.artikel.length > 0 && (
@@ -212,6 +229,34 @@ export function DiseaseDetailPage() {
                     <Badge key={part.id} variant="outline">
                       {part.nama}
                     </Badge>
+                  ))}
+                </div>
+              </section>
+            </FadeIn>
+          )}
+          {data.patogen && data.patogen.length > 0 && (
+            <FadeIn>
+              <section className="mt-8 md:mt-10">
+                <ArticleHeading>Patogen penyebab</ArticleHeading>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {data.patogen.map((pg) => (
+                    <Link
+                      key={pg.id}
+                      to={`/patogen/${pg.id}`}
+                      className="rounded-xl border border-border bg-card p-4 transition hover:border-pine/40 hover:shadow-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-md bg-pine/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-pine">
+                          {pg.jenis}
+                        </span>
+                        <h3 className="font-medium text-ink">{pg.nama}</h3>
+                      </div>
+                      {pg.deskripsi && (
+                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground line-clamp-3">
+                          {pg.deskripsi}
+                        </p>
+                      )}
+                    </Link>
                   ))}
                 </div>
               </section>

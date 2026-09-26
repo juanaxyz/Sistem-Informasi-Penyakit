@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { LoginPayload, RegisterPayload, User } from "@/lib/types";
 import { AuthContext } from "./auth-context-base";
+import type { UpdateProfilePayload } from "./auth-context-base";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -33,13 +34,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUser();
   }, [token]);
 
-const login = async (payload: LoginPayload) => {
-       const res = await api.auth.login(payload);
-       localStorage.setItem("token", res.token);
-       setToken(res.token);
-       setUser(res.user);
-       return res.user;
-   };
+const login = async (payload: LoginPayload): Promise<User> => {
+    const res = await api.auth.login(payload);
+    localStorage.setItem("token", res.token);
+    setToken(res.token);
+    setUser(res.user);
+    return res.user;
+  };
 
   const register = async (payload: RegisterPayload) => {
     const res = await api.auth.register(payload);
@@ -55,6 +56,12 @@ const login = async (payload: LoginPayload) => {
     api.auth.logout().catch(() => {});
   };
 
+  const updateProfile = async (payload: UpdateProfilePayload) => {
+    const res = await api.auth.updateProfile(payload);
+    setUser(res.user);
+    return res.user;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -64,6 +71,7 @@ const login = async (payload: LoginPayload) => {
         login,
         register,
         logout,
+        updateProfile,
       }}
     >
       {children}

@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { FadeIn } from "@/components/FadeIn";
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,11 @@ import { Badge } from "@/components/ui/badge";
 export default function RiwayatPage() {
   const queryClient = useQueryClient();
   const [limit, setLimit] = useState(20);
-  const [offset, setOffset] = useState(0);
-  const [total, setTotal] = useState(0);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["riwayat", limit, offset],
+    queryKey: ["riwayat", limit],
     queryFn: async () => {
-      const res = await api.riwayat.list(limit, offset);
-      // We don't have total count from API; we can approximate or add another endpoint.
-      // For simplicity, we'll set total to data length (not accurate for pagination).
-      // We'll skip pagination for now and just load all.
+      const res = await api.riwayat.list(limit);
       return res;
     },
   });
@@ -28,7 +23,7 @@ export default function RiwayatPage() {
   };
 
   if (isLoading) return <FadeIn><div className="text-center py-8">Loading...</div></FadeIn>;
-  if (error) return <FadeIn><div className="text-center py-8">Error: {(error as any).message}</div></FadeIn>;
+  if (error) return <FadeIn><div className="text-center py-8">Error: {error.message}</div></FadeIn>;
 
   const riwayatList = data?.riwayat ?? [];
 

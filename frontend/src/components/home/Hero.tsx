@@ -47,7 +47,7 @@ export default function Hero() {
             variant="outline"
             className="w-full sm:w-auto"
           >
-            <Link to="/analisis-xray">Try AI Analysis</Link>
+            <Link to="/analisis">Try AI Analysis</Link>
           </Button>
         </div>
 

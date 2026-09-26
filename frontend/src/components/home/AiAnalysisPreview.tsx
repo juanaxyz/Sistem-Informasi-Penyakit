@@ -64,7 +64,7 @@ export default function AiAnalysisPreview() {
         </div>
       </div>
       <Button asChild size="lg" className="mt-6">
-        <Link to="/analisis-xray">
+        <Link to="/analisis">
           Try AI Analysis
           <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
         </Link>

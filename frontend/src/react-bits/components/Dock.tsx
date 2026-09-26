@@ -59,6 +59,7 @@ function DockItem({
       x: 0,
       width: baseItemSize,
     };
+
     return val - rect.x - baseItemSize / 2;
   });
 
@@ -67,6 +68,7 @@ function DockItem({
     [-distance, 0, distance],
     [baseItemSize, magnification, baseItemSize],
   );
+
   const size = useSpring(targetSize, spring);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -82,24 +84,30 @@ function DockItem({
 
   return (
     <motion.div
-      ref={ref}
-      style={{
-        width: size,
-        height: size,
-      }}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      whileHover={{ y: -4 }}
-      whileTap={{ y: 0 }}
-      transition={{ duration: 0.15 }}
-      className={`relative inline-flex items-center justify-center rounded-2xl border ${stateClass} ${className}`}
-      tabIndex={0}
-      role="button"
-      aria-pressed={active}
-      aria-label={typeof label === "string" ? label : undefined}
-    >
-      {children}
-    </motion.div>
+  ref={ref}
+  style={{
+    width: size,
+    height: size,
+  }}
+  onClick={onClick}
+  onKeyDown={handleKeyDown}
+  whileHover={{ y: -4 }}
+  whileTap={{ y: 0 }}
+  transition={{ duration: 0.15 }}
+  className={`group relative inline-flex items-center justify-center rounded-2xl border ${stateClass} ${className}`}
+  tabIndex={0}
+  role="button"
+  aria-pressed={active}
+  aria-label={typeof label === "string" ? label : undefined}
+>
+  {children}
+
+  {label && (
+    <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-pine px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+      {label}
+    </span>
+  )}
+</motion.div>
   );
 }
 

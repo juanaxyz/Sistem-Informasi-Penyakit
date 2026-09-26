@@ -44,7 +44,7 @@ export default function FinalCta() {
               variant="outline"
               className="w-full border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white sm:w-auto"
             >
-              <Link to="/analisis-xray">Coba Analisis X-Ray</Link>
+              <Link to="/analisis">Coba Analisis</Link>
             </Button>
           </div>
         </div>

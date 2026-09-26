@@ -9,7 +9,7 @@ import { SiteHeader } from "./components/SiteHeader";
 import { ChatWidget } from "./components/ChatWidget";
 import HomePage from "./pages/HomePage";
 import { BodyMapPage } from "./pages/BodyMapPage";
-import XRayAnalysisPage from "./pages/XRayAnalysisPage";
+import AnalysisPage from "./pages/AnalysisPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import RiwayatPage from "./pages/RiwayatPage";
@@ -17,8 +17,9 @@ import AnalysisDetailPage from "./pages/AnalysisDetailPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Dock from "./react-bits/components/Dock";
 import AdminPage from "./pages/Admin";
+import { PatogenDetailPage } from "./pages/PatogenDetailPage";
 
-import { House, ScanSearch, ScanLine, FileText } from "lucide-react";
+import { House, ScanSearch, ScanLine } from "lucide-react";
 import { DiseaseDetailPage } from "./pages/DiseaseDetailPage";
 
 export default function App() {
@@ -40,22 +41,22 @@ export default function App() {
     },
     {
       icon: <ScanLine size={18} />,
-      label: "Analisis X-Ray",
-      active: location.pathname.startsWith("/analisis-xray"),
-      onClick: () => navigate("/analisis-xray"),
-    },
-    {
-      icon: <FileText size={18} />,
-      label: "Riwayat",
-      active: location.pathname.startsWith("/riwayat"),
-      onClick: () => navigate("/riwayat"),
-    },
-    {
-      icon: <FileText size={18} />,
-      label: "Admin",
-      active: location.pathname.startsWith("/admin"),
-      onClick: () => navigate("/admin"),
-    },
+      label: "Analisis",
+      active: location.pathname.startsWith("/analisis"),
+      onClick: () => navigate("/analisis"),
+    }
+    // {
+    //   icon: <FileText size={18} />,
+    //   label: "Riwayat",
+    //   active: location.pathname.startsWith("/riwayat"),
+    //   onClick: () => navigate("/riwayat"),
+    // },
+    // {
+    //   icon: <FileText size={18} />,
+    //   label: "Admin",
+    //   active: location.pathname.startsWith("/admin"),
+    //   onClick: () => navigate("/admin"),
+    // },
   ];
 
   return (
@@ -67,10 +68,10 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/body-map" element={<BodyMapPage />} />
           <Route
-            path="/analisis-xray"
+            path="/analisis"
             element={
               <ProtectedRoute>
-                <XRayAnalysisPage />
+                <AnalysisPage />
               </ProtectedRoute>
             }
           />
@@ -96,6 +97,7 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
 /* Detail penyakit */
            <Route path="/penyakit/:slug" element={<DiseaseDetailPage />} />
+           <Route path="/patogen/:id" element={<PatogenDetailPage />} />
            {/* Admin route - protected for admin role only */}
            <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminPage /></ProtectedRoute>} />
            <Route path="*" element={<Navigate to="/" replace />} />

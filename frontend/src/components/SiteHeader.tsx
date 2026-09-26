@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { LogOut, User as UserIcon, ChevronDown } from "lucide-react";
 import { HeaderSearch } from "./HeaderSearch";
 import { useAuth } from "@/hooks/useAuth";
+import { UserMenuOverlay } from "./UserMenuOverlay";
 
 export function SiteHeader() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfile } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="border-b border-border bg-background/80 backdrop-blur sticky top-0 z-10">
@@ -21,7 +24,12 @@ export function SiteHeader() {
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           {user ? (
             <div className="flex items-center gap-2.5">
-              <span className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-ink">
+              <button
+                type="button"
+                onClick={() => setMenuOpen(true)}
+                title="Menu pengguna"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-ink transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <UserIcon size={14} className="text-pine" />
                 <span>{user.nama}</span>
                 {user.role === "admin" && (
@@ -29,7 +37,8 @@ export function SiteHeader() {
                     Admin
                   </span>
                 )}
-              </span>
+                <ChevronDown size={13} className="text-muted-foreground" />
+              </button>
               <button
                 type="button"
                 onClick={logout}
@@ -38,6 +47,15 @@ export function SiteHeader() {
               >
                 <LogOut size={14} />
               </button>
+              {user && (
+                <UserMenuOverlay
+                  open={menuOpen}
+                  onClose={() => setMenuOpen(false)}
+                  user={user}
+                  onLogout={logout}
+                  onUpdateProfile={updateProfile}
+                />
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-2">
