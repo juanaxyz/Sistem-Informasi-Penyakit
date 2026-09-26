@@ -68,7 +68,7 @@ def chunk_text(
 
     `header` (mis. "Nama: COVID-19 | Bagian: Pengertian") disisipkan di depan
     setiap chunk agar tiap potongan tetap punya konteks sendiri ketika nanti
-    dipakai sebagai sumber jawaban â€” vital karena retrieval bisa mengembalikan
+    dipakai sebagai sumber jawaban — vital karena retrieval bisa mengembalikan
     chunk tengah yang tidak menyebut nama penyakitnya.
     """
     text = (text or "").strip()
