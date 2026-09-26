@@ -35,6 +35,11 @@ module.exports = {
       : true,
   },
   ragApiUrl: process.env.RAG_API_URL || "http://localhost:8000",
+  // Token yang dibagikan ke service Python untuk endpoint yang memodifikasi
+  // data (sinkronisasi embedding). Kosong => BFF tidak mengirim header itu dan
+  // service akan menolak sinkronisasi dengan 503. Harus sama dengan
+  // RAG_ADMIN_TOKEN di service/.env.
+  ragAdminToken: process.env.RAG_ADMIN_TOKEN || "",
   // Analisis citra dimuat di service Python yang sama (default ikut RAG_API_URL).
   modelApiUrl: process.env.MODEL_API_URL || process.env.RAG_API_URL || "http://localhost:8000",
   uploadsDir: path.resolve(__dirname, "..", "..", "uploads"),

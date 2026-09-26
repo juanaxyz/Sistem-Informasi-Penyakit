@@ -129,9 +129,14 @@ konstanta internal (bukan input user) demi keamanan SQL injection.
 | `prediksi`                  | Hasil prediksi per model per riwayat                           |
 | `model`                     | Daftar model AI aktif                                          |
 | `faq` / `jenis_analisis` / `jenis_analisis_bagian_tubuh` | Master pendukung (digunakan RAG / alur analisis) |
+| `knowledge_embeddings` | Lapisan vector khusus RAG: satu baris per **chunk** dari `artikel_bagian` / `faq` (256 token/chunk), `embedding VECTOR(384)` + index HNSW. Dimiliki `service/` (`service/db/schema.sql`) |
 
 Catatan: `prediksi` ber-FK ke `model` dan `penyakit`; baris array bisa disisipkan
 bulk. Detail kolom lihat `server/db/schema.sql` + definisi SELECT pada controller.
+
+`artikel.konten` adalah kolom **legacy** yang kini kosong — konten artikel nyata
+berada di `artikel_bagian`. Pembacaan mana pun (termasuk seeding RAG) harus lewat
+`artikel_bagian`.
 
 ---
 
@@ -184,7 +189,8 @@ Satu service Python/FastAPI yang menggabungkan dua kemampuan, di folder
 `service/` (sebelumnya dua folder terpisah: `RAG/` dan `Analisis/`).
 
 - **RAG Chat**: menjawab pertanyaan pengguna dengan *retrieval* dari basis
-  pengetahuan (Supabase + Gemini). BFF meneruskan `POST /api/rag/chat`.
+  pengetahuan (tabel `knowledge_embeddings` di PostgreSQL/pgvector yang sama +
+  Gemini). BFF meneruskan `POST /api/rag/chat`.
   Lihat `service/README.md` & `service/RAG_ARCHITECTURE.md`.
 - **Analisis Citra**: **1 endpoint** `POST /api/prediksi` menerima **1 gambar**
   (`multipart`, field `image`) dan mengembalikan **3 hasil dari 3 model berbeda**

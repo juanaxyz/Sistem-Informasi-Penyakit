@@ -1,39 +1,55 @@
-from supabase import create_client
+﻿"""Similarity search vektor di PostgreSQL (pgvector).
 
-from app.config import (
-    SUPABASE_URL,
-    SUPABASE_KEY,
-    SIMILARITY_THRESHOLD,
-    MATCH_COUNT,
-)
+Embedding dilakukan lokal (`services/embedding.py`), sehingga tidak ada lagi
+panggilan API eksternal di jalur retrieval. Query berparameter penuh (`%s`).
+"""
+
+from app.config import MATCH_COUNT, MAX_CHUNKS_PER_PENYAKIT, SIMILARITY_THRESHOLD
+from app.db import connection, to_vector_literal
 from app.services.embedding import generate_embedding
-from app.config import TASK_TYPE_QUERY
 
-_supabase_client = None
-
-
-def _get_supabase():
-    global _supabase_client
-    if _supabase_client is None:
-        if not SUPABASE_URL or not SUPABASE_KEY:
-            raise ValueError("SUPABASE_URL/SUPABASE_KEY belum diatur di env service/")
-        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    return _supabase_client
+# Operator `<=>` = cosine distance, jadi similarity = 1 - distance.
+# Karena konten dipecah jadi beberapa chunk per penyakit, `ROW_NUMBER` dipakai
+# untuk membatasiä¸Šä½ N chunk per penyakit -- tanpa itu, 5 hasil retrieval bisa
+# semuanya berasal dari satu penyakit yang sama. FAQ (penyakit_id NULL)
+# dikelompokkan lewat -id agar tiap baris punya partisi sendiri; `PARTITION BY`
+# memperlakukan NULL sebagai satu kelompok, yang bila dibiarkan akan mengembalikan
+# maksimal 1 chunk FAQ.
+MATCH_SQL = f"""
+    SELECT source_type, source_id, chunk_index, penyakit_id, content, similarity
+    FROM (
+        SELECT
+            ke.source_type,
+            ke.source_id,
+            ke.chunk_index,
+            ke.penyakit_id,
+            ke.content,
+            1 - (ke.embedding <=> %s::vector) AS similarity,
+            ROW_NUMBER() OVER (
+                PARTITION BY COALESCE(ke.penyakit_id, -ke.id)
+                ORDER BY ke.embedding <=> %s::vector ASC
+            ) AS rn
+        FROM knowledge_embeddings ke
+        WHERE ke.embedding IS NOT NULL
+          AND 1 - (ke.embedding <=> %s::vector) >= %s
+    ) ranked
+    WHERE rn <= %s
+    ORDER BY similarity DESC
+    LIMIT %s
+"""
 
 
 def retrieve_chunks(question: str) -> list[dict]:
-    query_vector = generate_embedding(question, task_type=TASK_TYPE_QUERY)
+    query_vector = generate_embedding(question)
+    literal = to_vector_literal(query_vector)
 
-    result = _get_supabase().rpc(
-        "match_knowledge_embeddings",
-        {
-            "query_embedding": query_vector,
-            "match_count": MATCH_COUNT,
-            "similarity_threshold": SIMILARITY_THRESHOLD,
-        },
-    ).execute()
+    with connection() as conn:
+        rows = conn.execute(
+            MATCH_SQL,
+            (literal, literal, literal, SIMILARITY_THRESHOLD, MAX_CHUNKS_PER_PENYAKIT, MATCH_COUNT),
+        ).fetchall()
 
-    return result.data or []
+    return [dict(row) for row in rows]
 
 
 def is_out_of_scope(chunks: list[dict]) -> bool:

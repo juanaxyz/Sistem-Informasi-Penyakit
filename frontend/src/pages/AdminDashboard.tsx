@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type KnowledgeSyncResult } from "@/lib/api";
 import { FadeIn } from "@/components/FadeIn";
 
 interface DashboardData {
@@ -102,6 +102,24 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<KnowledgeSyncResult | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncError(null);
+    setSyncResult(null);
+    try {
+      setSyncResult(await api.admin.loadKnowledge());
+    } catch (err) {
+      setSyncError(
+        err instanceof ApiError ? err.message : "Gagal menyinkronkan basis pengetahuan",
+      );
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -155,14 +173,49 @@ export default function Dashboard() {
   return (
     <FadeIn>
       <div className="space-y-6">
-        <div>
-          <h3 className="font-display text-xl font-semibold text-ink">
-            Ringkasan Platform
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Gambaran menyeluruh isi konten, cakupan artikel, dan aktivitas analisis
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-display text-xl font-semibold text-ink">
+              Ringkasan Platform
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Gambaran menyeluruh isi konten, cakupan artikel, dan aktivitas analisis
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing}
+            className="inline-flex items-center gap-2 rounded-lg border border-pine px-3 py-2 text-xs font-medium text-pine transition-colors hover:bg-pine hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {syncing && (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            )}
+            {syncing ? "Menyinkronkan..." : "Sinkronkan Basis Pengetahuan"}
+          </button>
         </div>
+
+        {(syncResult || syncError) && (
+          <div
+            role="status"
+            className={
+              syncError
+                ? "rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
+                : "rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800"
+            }
+          >
+            {syncError ? (
+              syncError
+            ) : (
+              <>
+                Selesai: {syncResult!.total} chunk dari{" "}
+                {syncResult!.sumber_berubah + syncResult!.sumber_tidak_berubah} sumber
+                (berubah {syncResult!.sumber_berubah}, tidak berubah{" "}
+                {syncResult!.sumber_tidak_berubah}) dalam {syncResult!.durasi_detik}s.
+              </>
+            )}
+          </div>
+        )}
 
         {/* Kartu statistik utama */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

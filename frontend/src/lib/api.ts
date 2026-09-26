@@ -38,6 +38,20 @@ export class ApiError extends Error {
   }
 }
 
+/** Ringkasan hasil sinkronisasi embedding knowledge base. */
+export interface KnowledgeSyncResult {
+  total: number;
+  per_source: Record<string, number>;
+  sumber: Record<string, number>;
+  chunk_terembed: number;
+  sumber_berubah: number;
+  sumber_tidak_berubah: number;
+  sumber_dihapus: number;
+  model: string;
+  chunk_tokens: number;
+  durasi_detik: number;
+}
+
 function getAuthHeader(): Record<string, string> {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -211,6 +225,10 @@ export const api = {
     },
     chat: (payload: { question: string; session_id?: string; history?: ChatTurn[] }) =>
       post<ChatResult>("/api/rag/chat", payload),
+    admin: {
+      /** Sinkronkan ulang embedding knowledge base dari artikel + FAQ. */
+      loadKnowledge: () => post<KnowledgeSyncResult>("/api/admin/rag/load-knowledge", {}),
+    },
     auth: {
      register: (payload: RegisterPayload) =>
        post<AuthResponse>("/api/auth/register", payload),

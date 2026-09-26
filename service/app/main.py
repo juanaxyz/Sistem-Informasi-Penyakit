@@ -1,7 +1,20 @@
-from fastapi import FastAPI, File, HTTPException, UploadFile
+import secrets
 
-from app.config import ALLOW_STUB, GEMINI_API_KEY, MODELS
+import psycopg
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile
+
+from app import db
+from app.config import (
+    ALLOW_STUB,
+    EMBEDDING_DIMENSION,
+    EMBEDDING_MODEL,
+    GEMINI_API_KEY,
+    GENERATION_MODEL,
+    MODELS,
+    RAG_ADMIN_TOKEN,
+)
 from app.schemas.chat import ChatRequest
+from app.services.ingestion import IngestError, run_ingest
 from app.services.retrieval import retrieve_chunks, is_out_of_scope
 from app.services.generation import generate_answer
 from app.services.model_loader import load_registry
@@ -30,7 +43,11 @@ def health():
         "status": "OK",
         "rag": {
             "gemini_configured": bool(GEMINI_API_KEY),
-            "model": "gemini-3.6-flash",
+            "database": db.ping(),
+            "embedding_model": EMBEDDING_MODEL,
+            "embedding_dimension": EMBEDDING_DIMENSION,
+            "generation_model": GENERATION_MODEL,
+            "admin_sync_enabled": bool(RAG_ADMIN_TOKEN),
         },
         "prediksi": {
             "stub_allowed": ALLOW_STUB,
@@ -90,3 +107,36 @@ async def prediksi(image: UploadFile = File(...)):
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Gagal memproses gambar: {exc}") from exc
+
+@app.post("/api/load-knowledge")
+def load_knowledge(x_rag_admin_token: str = Header(default="")):
+    """Sinkronkan ulang embedding knowledge base dari `artikel_bagian` + `faq`.
+
+    Dipicu tombol "Sinkronkan Basis Pengetahuan" di Admin Dashboard lewat BFF.
+    Service Python yang menangani semuanya: ambil data -> chunk -> embed (lokal)
+    -> simpan ke PostgreSQL. Tidak ada body request.
+
+    Dilindungi dua lapis:
+      1. BFF mewajibkan role admin (satu-satunya pemanggil yang diizinkan).
+      2. Header `X-Rag-Admin-Token` dicocokkan dengan `RAG_ADMIN_TOKEN`.
+
+    Dijalankan sinkron: embedding lokal untuk korpus kecil hanya butuh beberapa
+    detik, jadi tidak perlu pola background job + polling.
+    """
+    if not RAG_ADMIN_TOKEN:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "RAG_ADMIN_TOKEN belum diatur di service/.env, sehingga endpoint "
+                "sinkronisasi dinonaktifkan demi keamanan."
+            ),
+        )
+    if not secrets.compare_digest(x_rag_admin_token, RAG_ADMIN_TOKEN):
+        raise HTTPException(status_code=401, detail="Token admin tidak valid")
+
+    try:
+        return run_ingest(log=lambda *_args: None)
+    except IngestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except psycopg.Error as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal sinkronisasi basis pengetahuan: {exc}")

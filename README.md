@@ -62,10 +62,12 @@ npm run dev                   # http://localhost:5173
 
 ```powershell
 cd service
-Copy-Item .env.example .env   # isi GEMINI_API_KEY, SUPABASE_URL, SUPABASE_KEY, ALLOW_STUB
+Copy-Item .env.example .env   # isi GEMINI_API_KEY, PG* (sama dengan server/.env), ALLOW_STUB
 pip install -r requirements.txt
+python scripts/apply_schema.py  # buat tabel knowledge_embeddings (sekali, idempotent)
+python ingest.py                 # seeding embedding (ulang tiap konten berubah)
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-# lihat service/README.md untuk seeding RAG, model .onnx, dll.
+# lihat service/README.md untuk model .onnx, dll.
 ```
 
 ## Konfigurasi Environment

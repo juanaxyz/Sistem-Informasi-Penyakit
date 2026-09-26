@@ -3,8 +3,11 @@ uvicorn
 pydantic
 python-dotenv
 google-genai
-supabase
+psycopg[binary,pool]
+sentence-transformers
+torch
 python-multipart
 numpy
 pillow
 onnxruntime
+requests

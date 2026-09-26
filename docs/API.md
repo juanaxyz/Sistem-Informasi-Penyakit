@@ -70,6 +70,7 @@ Dapatkan token dari `POST /api/auth/login` (atau `register`).
 | GET    | `/api/riwayat/:id`                     | user     | Detail riwayat + prediksi (pemilik/admin)    |
 | POST   | `/api/riwayat/:id/analisis`            | user     | Jalankan analisis via service Python           |
 | POST   | `/api/rag/chat`                        | public   | Proxy ke RAG API (pertanyaan edukasi)        |
+| POST   | `/api/admin/rag/load-knowledge`        | admin    | Sinkronisasi embedding knowledge base        |
 
 ---
 
@@ -217,6 +218,43 @@ Content-Type: application/json
   "session_id": "sess-123"
 }
 ```
+
+### Sinkronisasi basis pengetahuan (admin)
+
+```http
+POST /api/admin/rag/load-knowledge
+Authorization: Bearer <token-admin>
+```
+
+Tanpa request body. BFF mem-proxy ke RAG API `POST /api/load-knowledge` dengan
+header `X-Rag-Admin-Token` (wajib, ditolak 401 bila kosong/salah). Endpoint
+Python membaca `artikel_bagian` + `faq` dari PostgreSQL, memecah tiap sumber
+jadi chunk 256 token, menghitung embedding secara lokal, lalu meng-upsert ke
+`knowledge_embeddings`. Bisa dipicu juga lewat CLI `python ingest.py`.
+
+```json
+{
+  "ok": true,
+  "message": "Basis pengetahuan tersinkron.",
+  "data": {
+    "ok": true,
+    "embed_model": "LazarusNLP/all-indo-e5-small-v4",
+    "dimensions": 384,
+    "source_berubah": 3,
+    "source_tidak_berubah": 7,
+    "penyakit": { "chunk": 2, "sumber": 1 },
+    "faq": { "chunk": 8, "sumber": 8 },
+    "total_chunk": 10,
+    "durasi_detik": 0.26
+  }
+}
+```
+
+`source_berubah` / `source_tidak_berubah` bersifat laporan (hasil perbandingan
+`source_hash`); embedding tetap dihitung ulang penuh setiap permintaan.
+Respons error: `401` (bukan admin / token salah), `502` (RAG API tidak
+terjangkau). Timeout BFF 120 s, jadi proses pertama yang memuat model memberi
+respons lebih lambat.
 
 ### Dashboard (admin)
 

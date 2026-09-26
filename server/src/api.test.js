@@ -359,6 +359,77 @@ describe("API Test Suite", () => {
     });
   });
 
+  // --- PROXY SINKRONISASI KNOWLEDGE BASE (admin only) ---
+  describe("POST /api/admin/rag/load-knowledge", () => {
+    const url = "/api/admin/rag/load-knowledge";
+
+    it("harus 401 tanpa token JWT", async () => {
+      const res = await request(app).post(url);
+      expect(res.status).toBe(401);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("harus 403 untuk role user (bukan admin)", async () => {
+      const res = await request(app)
+        .post(url)
+        .set("Authorization", `Bearer ${signToken({ role: "user" })}`);
+
+      expect(res.status).toBe(403);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("harus meneruskan sinkronisasi untuk role admin", async () => {
+      const ringkasan = {
+        total: 10,
+        per_source: { disease: 2, faq: 8 },
+        sumber_berubah: 3,
+        chunk_terembed: 10,
+        durasi_detik: 1.2,
+      };
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ringkasan,
+      });
+
+      const res = await request(app)
+        .post(url)
+        .set("Authorization", `Bearer ${signToken({ role: "admin" })}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(ringkasan);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/load-knowledge"),
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    it("harus meneruskan status error dari service (400)", async () => {
+      fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ detail: "Tidak ada konten sumber." }),
+      });
+
+      const res = await request(app)
+        .post(url)
+        .set("Authorization", `Bearer ${signToken({ role: "admin" })}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty("error", "Tidak ada konten sumber.");
+    });
+
+    it("harus 502 jika service RAG tidak terjangkau", async () => {
+      fetch.mockRejectedValueOnce(new TypeError("fetch failed"));
+
+      const res = await request(app)
+        .post(url)
+        .set("Authorization", `Bearer ${signToken({ role: "admin" })}`);
+
+      expect(res.status).toBe(502);
+    });
+  });
+
   // --- AUTH ---
   describe("AUTH Endpoints", () => {
     describe("POST /api/auth/register", () => {
