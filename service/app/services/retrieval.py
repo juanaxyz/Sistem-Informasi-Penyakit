@@ -9,14 +9,22 @@ from app.config import (
 from app.services.embedding import generate_embedding
 from app.config import TASK_TYPE_QUERY
 
+_supabase_client = None
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def _get_supabase():
+    global _supabase_client
+    if _supabase_client is None:
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            raise ValueError("SUPABASE_URL/SUPABASE_KEY belum diatur di env service/")
+        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _supabase_client
 
 
 def retrieve_chunks(question: str) -> list[dict]:
     query_vector = generate_embedding(question, task_type=TASK_TYPE_QUERY)
 
-    result = supabase.rpc(
+    result = _get_supabase().rpc(
         "match_knowledge_embeddings",
         {
             "query_embedding": query_vector,

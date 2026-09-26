@@ -31,7 +31,8 @@ dist-ssr
 # Python
 __pycache__/
 *.py[cod]
-RAG/.vscode/
+service/.vscode/
+service/models/*.onnx
 
 # AI
 context/*
@@ -47,3 +48,5 @@ frontend/PRODUCT.md
 
 
 laporan/*
+# Gambar upload analisis
+server/uploads/

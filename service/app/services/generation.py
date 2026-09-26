@@ -2,8 +2,16 @@ from google import genai
 
 from app.config import GEMINI_API_KEY, GENERATION_MODEL
 
+_gemini_client = None
 
-gemini = genai.Client(api_key=GEMINI_API_KEY)
+
+def _get_client():
+    global _gemini_client
+    if _gemini_client is None:
+        if not GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY belum diatur di env service/")
+        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    return _gemini_client
 
 
 def _build_context(chunks: list[dict]) -> str:
@@ -40,6 +48,8 @@ def generate_answer(
     context = _build_context(chunks)
     riwayat = _build_history(history)
 
+    history_part = f"RIWAYAT PERCAKAPAN:\n{riwayat}\n\n" if riwayat else ""
+
     prompt = f"""
 Kamu adalah asisten informasi kesehatan pada website Sistem Informasi Penyakit Tubuh.
 
@@ -56,12 +66,12 @@ Jangan membuat diagnosis atau memberikan kepastian medis kepada pengguna.
 CONTEXT:
 {context}
 
-{('RIWAYAT PERCAKAPAN:\n' + riwayat + '\n\n') if riwayat else ''}PERTANYAAN:
+{history_part}PERTANYAAN:
 {question}
 
 JAWABAN:
 """
 
-    response = gemini.models.generate_content(model=GENERATION_MODEL, contents=prompt)
+    response = _get_client().models.generate_content(model=GENERATION_MODEL, contents=prompt)
 
     return response.text

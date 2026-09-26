@@ -209,7 +209,7 @@ frontend ChatWidget ──POST /api/rag/chat──▶ BFF (Express :4000)
 - CORS cukup diatur di BFF (pola existing); FastAPI tidak perlu CORS untuk akses server-side.
 - Cari tahu route BFF di `server/src/server.js` (port 4000), jangan duplikasi logika.
 
-## Dependensi Python (`RAG/requirements.txt`)
+## Dependensi Python (`service/requirements.txt`)
 
 ```
 fastapi
@@ -218,6 +218,10 @@ pydantic
 python-dotenv
 google-genai
 supabase
+python-multipart
+numpy
+pillow
+onnxruntime
 ```
 
 > **Catatan env:** Agent berada di WSL; Python conda user ada di **Windows**. Jangan jalankan `pip install` di WSL — install manual di conda Windows lalu jalankan `ingest.py` / server FastAPI dari sana.
