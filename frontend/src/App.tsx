@@ -104,7 +104,7 @@ export default function App() {
         </Routes>
       </main>
 
-      <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2">
+      <div className="pointer-events-none fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 flex justify-center">
         <Dock
           className="bg-background"
           items={items}

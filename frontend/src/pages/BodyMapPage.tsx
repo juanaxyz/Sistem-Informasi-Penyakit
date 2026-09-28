@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FadeIn } from "@/components/FadeIn";
 import { BodyMap } from "../components/bodyMap/BodyMap";
 import { ResultsPanel } from "../components/ResultsPanel";
@@ -7,6 +7,7 @@ import { useSystemsByBodyPart } from "../hooks/useSystemsByBodyPart";
 
 export function BodyMapPage() {
   const [selectedPartId, setSelectedPartId] = useState<number | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const { data: bodyParts = [] } = useBodyParts();
   const { data: systems = [] } = useSystemsByBodyPart(selectedPartId);
@@ -23,6 +24,15 @@ export function BodyMapPage() {
 
   const handlePartClick = (id: number) => {
     setSelectedPartId(id);
+    const results = resultsRef.current;
+    if (!results) return;
+    if (window.innerWidth < 1024) {
+      requestAnimationFrame(() => {
+        results.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    } else {
+      results.scrollTop = 0;
+    }
   };
 
   return (
@@ -46,7 +56,10 @@ export function BodyMapPage() {
             selectedPartMeta={selectedPartMeta}
           />
         </div>
-        <div className="lg:col-span-5 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto lg:pr-2 lg:-mr-2">
+        <div
+          ref={resultsRef}
+          className="scroll-mt-24 lg:scroll-mt-0 lg:col-span-5 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto lg:pr-2 lg:-mr-2"
+        >
           <ResultsPanel
             key={selectedPartId ?? "none"}
             selectedPartId={selectedPartId}

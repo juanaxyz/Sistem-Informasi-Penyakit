@@ -5,7 +5,7 @@ import { useSearchDiseases } from "@/hooks/useSearchDiseases";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UrgencyBadge } from "./UrgencyBadge";
 
-export function HeaderSearch() {
+export function HeaderSearch({ autoFocus }: { autoFocus?: boolean }) {
   const [query, setQuery] = useState("");
   const { data, isLoading, error, activeQuery } = useSearchDiseases(query);
   const diseases = data ?? [];
@@ -33,6 +33,7 @@ export function HeaderSearch() {
           placeholder="Cari penyakit atau gejala..."
           aria-label="Cari penyakit atau gejala"
           autoComplete="off"
+          autoFocus={autoFocus}
           className="w-full pl-9 pr-8 py-2 text-base sm:text-sm border border-input bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
         />
         {query && (
