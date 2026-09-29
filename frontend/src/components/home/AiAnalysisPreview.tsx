@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
+import { motion } from "motion/react";
 const CLASSIFICATION = [
   { label: "Pneumonia", value: 82 },
   { label: "Normal", value: 9 },
@@ -30,7 +30,6 @@ export default function AiAnalysisPreview() {
             alt="Ilustrasi peta tubuh untuk analisis AI"
             className="h-64 w-full object-contain mix-blend-multiply"
           />
-         
         </div>
         <div className="flex flex-col justify-center gap-4">
           {CLASSIFICATION.map((item) => (
@@ -44,9 +43,15 @@ export default function AiAnalysisPreview() {
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-pine transition-all"
-                  style={{ width: `${item.value}%` }}
+                <motion.div
+                  className="h-full rounded-full bg-pine"
+                  initial={{ width: 0 }}
+                  whileInView={{ width: `${item.value}%` }}
+                  viewport={{ once: false }}
+                  transition={{
+                    duration: 1.2,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
                 />
               </div>
             </div>

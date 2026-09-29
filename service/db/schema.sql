@@ -48,3 +48,10 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_embedding
 
 CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_penyakit
     ON knowledge_embeddings(penyakit_id);
+
+-- Body parts array untuk hybrid retrieval (symptom + body part search)
+ALTER TABLE knowledge_embeddings 
+    ADD COLUMN IF NOT EXISTS bagian_tubuh TEXT[] DEFAULT '{}';
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_bagian_tubuh
+    ON knowledge_embeddings USING GIN (bagian_tubuh);

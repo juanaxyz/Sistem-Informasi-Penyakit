@@ -62,6 +62,10 @@ GENERATION_MODEL = "gemini-3.6-flash"
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.40"))
 MATCH_COUNT = 5
 
+# Body part boost untuk hybrid retrieval (semantic + body part match)
+# Nilai 0.3 berarti body part match menambah 0.3 ke similarity score (max 1.0)
+BODY_PART_BOOST = 0.3
+
 # ==============================================================
 # Analisis citra — prediksi model ONNX (3 model, 1 input)
 # ==============================================================

@@ -29,6 +29,7 @@ REQUIRED_COLUMNS = {
     "source_id",
     "chunk_index",
     "penyakit_id",
+    "bagian_tubuh",
     "content",
     "source_hash",
     "content_hash",

@@ -33,13 +33,18 @@ SOURCE_FAQ = "faq"
 
 # Konten penyakit diambil dari `artikel_bagian` (kolom `artikel.konten` adalah
 # legacy yang kosong). Rantai relasi: artikel_bagian -> artikel -> penyakit.
+# Join bagian_tubuh via penyakit_bagian_tubuh untuk metadata body parts.
 DISEASE_SQL = """
     SELECT ab.id AS source_id, a.id_penyakit AS penyakit_id,
-           ab.judul, ab.konten, p.nama AS nama_penyakit
+           ab.judul, ab.konten, p.nama AS nama_penyakit,
+           COALESCE(array_agg(DISTINCT bt.nama) FILTER (WHERE bt.nama IS NOT NULL), '{}') AS bagian_tubuh
     FROM artikel_bagian ab
     JOIN artikel a ON a.id = ab.id_artikel
     JOIN penyakit p ON p.id = a.id_penyakit
+    LEFT JOIN penyakit_bagian_tubuh pbt ON pbt.id_penyakit = p.id
+    LEFT JOIN bagian_tubuh bt ON bt.id = pbt.id_bagian_tubuh
     WHERE COALESCE(btrim(ab.konten), '') <> ''
+    GROUP BY ab.id, a.id_penyakit, ab.judul, ab.konten, p.nama
     ORDER BY a.id_penyakit, ab.urutan, ab.id
 """
 
@@ -84,6 +89,7 @@ def _plan_rows(conn: psycopg.Connection, tokenizer) -> list[dict]:
         raw = (row["konten"] or "").strip()
         source_hash = content_sha256(f"{row['nama_penyakit']}\n{row['judul'] or ''}\n{raw}")
         pieces = chunk_text(raw, tokenizer, header=_disease_header(row))
+        bagian_tubuh = row["bagian_tubuh"] if row["bagian_tubuh"] else []
         for i, piece in enumerate(pieces):
             planned.append(
                 {
@@ -91,6 +97,7 @@ def _plan_rows(conn: psycopg.Connection, tokenizer) -> list[dict]:
                     "source_id": row["source_id"],
                     "chunk_index": i,
                     "penyakit_id": row["penyakit_id"],
+                    "bagian_tubuh": bagian_tubuh,
                     "content": piece,
                     "source_hash": source_hash,
                     "content_hash": content_sha256(piece),
@@ -203,11 +210,12 @@ def run_ingest(log=print) -> dict:
                 conn.execute(
                     """
                     INSERT INTO knowledge_embeddings
-                        (source_type, source_id, chunk_index, penyakit_id, content,
+                        (source_type, source_id, chunk_index, penyakit_id, bagian_tubuh, content,
                          source_hash, content_hash, embed_model, embedding)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::vector)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector)
                     ON CONFLICT (source_type, source_id, chunk_index) DO UPDATE SET
                         penyakit_id     = EXCLUDED.penyakit_id,
+                        bagian_tubuh    = EXCLUDED.bagian_tubuh,
                         content         = EXCLUDED.content,
                         source_hash     = EXCLUDED.source_hash,
                         content_hash    = EXCLUDED.content_hash,
@@ -220,6 +228,7 @@ def run_ingest(log=print) -> dict:
                         row["source_id"],
                         row["chunk_index"],
                         row["penyakit_id"],
+                        row["bagian_tubuh"],
                         row["content"],
                         row["source_hash"],
                         row["content_hash"],

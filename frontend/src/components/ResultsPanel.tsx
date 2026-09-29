@@ -110,20 +110,22 @@ export function ResultsPanel({
       ? (systems.find((s) => s.id === selectedSystemId) ?? null)
       : null;
 
-  /* STATE 1 — belum memilih bagian tubuh. */
   if (selectedPartId === null || selectedPartName === null) {
-    return (
-      <div className="results-empty">
-        <span className="results-empty-icon">
-          <MousePointerClick className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <h2 className="results-empty-title">Pilih bagian tubuh</h2>
-        <p className="results-empty-desc">
-          Klik area pada peta tubuh untuk melihat sistem tubuh dan penyakit yang berkaitan.
-        </p>
-      </div>
-    );
-  }
+  return (
+    <div className="results-empty flex min-h-100 flex-col items-center justify-center text-center">
+      <span className="results-empty-icon">
+        <MousePointerClick className="h-5 w-5" aria-hidden="true" />
+      </span>
+
+      <h2 className="results-empty-title">Pilih bagian tubuh</h2>
+
+      <p className="results-empty-desc max-w-md">
+        Klik area pada peta tubuh untuk melihat sistem tubuh dan penyakit
+        yang berkaitan.
+      </p>
+    </div>
+  );
+}
 
   /* STATE 2 — memilih sistem tubuh. */
   if (selectedSystemId === null) {

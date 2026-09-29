@@ -34,8 +34,8 @@ const STEPS: readonly Step[] = [
   {
     type: "arrow",
     id: "arrow-down",
-    position: "left-[30%] top-[44%]",
-    rotate: "rotate-90",
+    position: "left-[30%] top-[41%]",
+    rotate: "rotate-80",
   },
   {
     type: "card",
@@ -43,13 +43,13 @@ const STEPS: readonly Step[] = [
     src: "/images/list-sistem.png",
     alt: "Peta tubuh setelah memilih bagian tubuh",
     aspect: "aspect-[16/10]",
-    position: "bottom-5 left-[6%] z-20 w-[74%] shadow-xl",
+    position: "bottom-12 left-[5%] z-20 w-[72%] shadow-xl",
   },
   {
     type: "arrow",
     id: "arrow-up-right",
-    position: "left-[70%] top-[54%]",
-    rotate: "-rotate-45",
+    position: "left-[57%] top-[54%] z-20",
+    rotate: "-rotate-30",
   },
   {
     type: "card",
@@ -217,7 +217,7 @@ export default function Hero() {
         variants={showcase}
         className="hidden lg:col-span-6 lg:block"
       >
-        <div className="relative mx-auto h-[34rem] w-full max-w-[40rem]">
+        <div className="relative mx-auto h-136 w-full max-w-160">
           {STEPS.map((step, index) =>
             step.type === "card" ? (
               <ShowcaseCard

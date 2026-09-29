@@ -50,7 +50,46 @@ def generate_answer(
 
     history_part = f"RIWAYAT PERCAKAPAN:\n{riwayat}\n\n" if riwayat else ""
 
-    prompt = f"""
+    # Detect if query is about symptoms/body parts (requesting differential diagnosis)
+    is_symptom_query = any(kw in question.lower() for kw in [
+        "sakit", "gejala", "rasa", "nyeri", "demam", "batuk", 
+        "sesak", "mual", "muntah", "pusing", "lemas", "kenapa",
+        "mengapa", "apa penyebab", "kemungkinan", "kira-kira", "kenapa ya"
+    ])
+
+    if is_symptom_query:
+        prompt = f"""
+Kamu adalah asisten informasi kesehatan pada website Sistem Informasi Penyakit Tubuh.
+
+Pengguna menanyakan kemungkinan penyakit berdasarkan gejala dan/atau lokasi nyeri.
+Berikan **daftar diferensial diagnosis** (kemungkinan penyakit) berdasarkan CONTEXT.
+
+FORMAT JAWABAN:
+1. **Nama Penyakit** — Kemungkinan: Tinggi/Sedang/Rendah
+   Gejala khas: [sebutkan 2-3 gejala utama dari CONTEXT]
+   Link: /penyakit/{{id}}
+
+2. **Nama Penyakit** — Kemungkinan: Tinggi/Sedang/Rendah
+   Gejala khas: ...
+   Link: /penyakit/{{id}}
+
+...
+
+⚠️ **PENTING**: 
+- Ini hanyalah informasi edukasi, BUKAN diagnosis medis.
+- Hanya tenaga kesehatan yang dapat melakukan diagnosis.
+- Segera konsultasikan ke dokter untuk penanganan yang tepat.
+
+CONTEXT:
+{context}
+
+{history_part}PERTANYAAN:
+{question}
+
+JAWABAN (format diferensial diagnosis):
+"""
+    else:
+        prompt = f"""
 Kamu adalah asisten informasi kesehatan pada website Sistem Informasi Penyakit Tubuh.
 
 Jawab pertanyaan pengguna hanya berdasarkan informasi yang diberikan pada CONTEXT.
