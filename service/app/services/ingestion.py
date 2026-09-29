@@ -117,6 +117,7 @@ def _plan_rows(conn: psycopg.Connection, tokenizer) -> list[dict]:
                     "source_id": row["source_id"],
                     "chunk_index": i,
                     "penyakit_id": None,
+                    "bagian_tubuh": [],
                     "content": piece,
                     "source_hash": source_hash,
                     "content_hash": content_sha256(piece),

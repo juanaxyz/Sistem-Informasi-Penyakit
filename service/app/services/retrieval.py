@@ -30,7 +30,7 @@ def extract_body_parts(query: str) -> list[str]:
 # Hybrid search: semantic similarity + body part boost
 # Body part boost: +0.3 jika chunk memiliki body part yang cocok dengan query
 MATCH_SQL = f"""
-    SELECT source_type, source_id, chunk_index, penyakit_id, content, 
+    SELECT source_type, source_id, chunk_index, penyakit_id, bagian_tubuh, content, 
            similarity + body_part_boost AS final_score
     FROM (
         SELECT
@@ -38,6 +38,7 @@ MATCH_SQL = f"""
             ke.source_id,
             ke.chunk_index,
             ke.penyakit_id,
+            ke.bagian_tubuh,
             ke.content,
             1 - (ke.embedding <=> %s::vector) AS similarity,
             CASE 

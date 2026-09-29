@@ -59,7 +59,7 @@ GENERATION_MODEL = "gemini-3.6-flash"
 #   in-scope    : 0.595 - 0.824 (COVID-19, atelektasis, cara pakai situs)
 #   out-of-scope: <= 0.248      (bitcoin, liga Champions, machine learning, ...)
 # Celahnya lebar; 0.40 berdiri sendiri di tengah. Re-kalibrasi bila isi KB berubah.
-SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.40"))
+SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.30"))
 MATCH_COUNT = 5
 
 # Body part boost untuk hybrid retrieval (semantic + body part match)
