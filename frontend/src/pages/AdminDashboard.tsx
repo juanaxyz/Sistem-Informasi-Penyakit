@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type KnowledgeSyncResult } from "@/lib/api";
-import { FadeIn } from "@/components/FadeIn";
 
 interface DashboardData {
   counts: {
@@ -143,7 +142,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-pine border-t-transparent" />
+        <div className="h-8 w-8 rounded-full border-4 border-pine border-t-transparent" />
       </div>
     );
   }
@@ -171,7 +170,6 @@ export default function Dashboard() {
   );
 
   return (
-    <FadeIn>
       <div className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -186,10 +184,10 @@ export default function Dashboard() {
             type="button"
             onClick={handleSync}
             disabled={syncing}
-            className="inline-flex items-center gap-2 rounded-lg border border-pine px-3 py-2 text-xs font-medium text-pine transition-colors hover:bg-pine hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg border border-pine px-3 py-2 text-xs font-medium text-pine disabled:cursor-not-allowed disabled:opacity-60 "
           >
             {syncing && (
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <span className="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent" />
             )}
             {syncing ? "Menyinkronkan..." : "Sinkronkan Basis Pengetahuan"}
           </button>
@@ -415,6 +413,5 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
-    </FadeIn>
-  );
-}
+    );
+  }

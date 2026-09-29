@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FadeIn } from "@/components/FadeIn";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError } from "@/lib/api";
@@ -63,19 +62,15 @@ export default function RegisterPage() {
 
   return (
     <div className="mx-auto max-w-md py-8">
-      <FadeIn>
-        <div className="rounded-xl border border-border bg-card p-6 md:p-8 shadow-sm">
-          <div className="text-center">
-            <p className="font-mono text-xs uppercase tracking-widest text-pine">
-              Pendaftaran Akun
-            </p>
-            <h1 className="mt-2 font-display text-2xl md:text-3xl font-medium text-ink tracking-tight">
-              Buat Akun Baru
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Daftar untuk menyimpan riwayat dan mengakses fitur sistem
-            </p>
-          </div>
+      <div className="rounded-xl border border-border bg-card p-6 md:p-8 shadow-sm">
+        <div className="text-center">
+          <h1 className="text-h1 font-display text-ink tracking-tight">
+            Buat Akun Baru
+          </h1>
+          <p className="mt-2 text-body font-body text-muted-foreground">
+            Daftar untuk menyimpan riwayat dan mengakses fitur sistem
+          </p>
+        </div>
 
           {error && (
             <div
@@ -206,7 +201,6 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
-      </FadeIn>
     </div>
   );
 }

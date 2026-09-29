@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { FadeIn } from "@/components/FadeIn";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError } from "@/lib/api";
@@ -47,19 +46,15 @@ try {
 
   return (
     <div className="mx-auto max-w-md py-8">
-      <FadeIn>
-        <div className="rounded-xl border border-border bg-card p-6 md:p-8 shadow-sm">
-          <div className="text-center">
-            <p className="font-mono text-xs uppercase tracking-widest text-pine">
-              Akun Pengguna
-            </p>
-            <h1 className="mt-2 font-display text-2xl md:text-3xl font-medium text-ink tracking-tight">
-              Masuk ke Akun
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Akses riwayat dan fitur analisis kesehatan Anda
-            </p>
-          </div>
+      <div className="rounded-xl border border-border bg-card p-6 md:p-8 shadow-sm">
+        <div className="text-center">
+          <h1 className="text-h1 font-display text-ink tracking-tight">
+            Masuk ke Akun
+          </h1>
+          <p className="mt-2 text-body font-body text-muted-foreground">
+            Akses riwayat dan fitur analisis kesehatan Anda
+          </p>
+        </div>
 
           {error && (
             <div
@@ -130,7 +125,6 @@ try {
             </Link>
           </p>
         </div>
-      </FadeIn>
     </div>
   );
 }

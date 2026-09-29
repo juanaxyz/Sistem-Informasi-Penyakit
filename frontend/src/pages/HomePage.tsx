@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { FadeIn } from "@/components/FadeIn";
 import Faq from "../components/Faq";
 import Hero from "../components/home/Hero";
 import HowItWorks from "../components/home/HowItWorks";
@@ -22,49 +21,31 @@ export default function HomePage() {
       <Hero />
 
       {/* ==================== HOW IT WORKS ==================== */}
-      <FadeIn>
-        <HowItWorks />
-      </FadeIn>
+      <HowItWorks />
 
       {/* ==================== STATISTICS ==================== */}
-      <FadeIn>
-        <Statistics />
-      </FadeIn>
+      <Statistics />
 
       {/* ==================== EXPLORE YOUR BODY ==================== */}
-      <FadeIn>
-        <ExploreSystems />
-      </FadeIn>
+      <ExploreSystems />
 
       {/* ==================== AI ANALYSIS PREVIEW ==================== */}
-      <FadeIn>
-        <AiAnalysisPreview />
-      </FadeIn>
+      <AiAnalysisPreview />
 
       {/* ==================== DISEASE INFORMATION ==================== */}
-      <FadeIn>
-        <DiseaseInformation />
-      </FadeIn>
+      <DiseaseInformation />
 
       {/* ==================== TRUSTED SOURCES ==================== */}
-      <FadeIn>
-        <TrustedSources />
-      </FadeIn>
+      <TrustedSources />
 
       {/* ==================== FINAL CALL TO ACTION ==================== */}
-      <FadeIn>
-        <FinalCta />
-      </FadeIn>
+      <FinalCta />
 
       {/* FAQ */}
-      <FadeIn>
-        <Faq />
-      </FadeIn>
+      <Faq />
 
       {/* ==================== DISCLAIMER FOOTER ==================== */}
-      <FadeIn>
-        <DisclaimerPill />
-      </FadeIn>
+      <DisclaimerPill />
     </div>
   );
 }

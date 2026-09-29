@@ -5,10 +5,9 @@ import { useSystemsByBodyPart } from "../hooks/useSystemsByBodyPart";
 import { useAnalysesByBodyPart } from "../hooks/useAnalysesByBodyPart";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
-import { FadeIn } from "@/components/FadeIn";
 import { Button } from "@/components/ui/button";
-import { AnimatePresence, motion } from "motion/react";
-import type { AnalysisTypeRecord } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import type { AnalysisTypeRecord, Prediction } from "@/lib/types";
 import {
   ArrowRight,
   Check,
@@ -55,35 +54,23 @@ function AnalysisSelectionModal({
   if (!open) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+      <div
         className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/20 px-4 py-6 backdrop-blur-[2px]"
         onClick={onClose}
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 12 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
+        <div
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
-          className="my-auto flex max-h-[calc(100dvh-3rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-border bg-white shadow-2xl"
+          className="my-auto flex max-h-[calc(100dvh-3rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-border bg-white shadow-2xl"
         >
           <div className="flex shrink-0 items-start justify-between border-b border-border px-6 py-5">
             <div>
-              <p className="text-xs font-medium uppercase tracking-widest text-pine/60">
-                Bagian tubuh
-              </p>
-
-              <h2 className="mt-1 text-xl font-semibold text-ink">
+              <h2 className="text-h3 font-display text-ink">
                 {bodyPartName}
               </h2>
 
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-body-sm font-body text-muted-foreground">
                 Pilih analisis yang ingin dilakukan.
               </p>
             </div>
@@ -98,10 +85,10 @@ function AnalysisSelectionModal({
             </button>
           </div>
 
-          <div className="space-y-3 overflow-y-auto p-5">
+          <div className="space-y-3 overflow-y-auto p-5 ">
             {loading ? (
               <div className="flex h-24 items-center justify-center">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-pine border-t-transparent" />
+                <div className="h-6 w-6 rounded-full border-2 border-pine border-t-transparent" />
               </div>
             ) : analyses.length > 0 ? (
               analyses.map((analysis) => (
@@ -116,9 +103,9 @@ function AnalysisSelectionModal({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-medium text-ink">{analysis.name}</h3>
+                    <h3 className="text-h4 font-display text-ink">{analysis.name}</h3>
 
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    <p className="mt-1 text-body-sm font-body leading-relaxed text-muted-foreground">
                       {analysis.description}
                     </p>
                   </div>
@@ -128,10 +115,10 @@ function AnalysisSelectionModal({
               ))
             ) : (
               <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center">
-                <p className="text-sm font-medium text-ink">
+                <p className="text-h4 font-display text-ink">
                   Belum ada analisis tersedia
                 </p>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                <p className="mt-1 text-body-sm font-body leading-relaxed text-muted-foreground">
                   Bagian tubuh ini belum memiliki jenis analisis. Saat ini baru
                   dada kiri dan dada kanan yang dapat dianalisis.
                 </p>
@@ -140,13 +127,12 @@ function AnalysisSelectionModal({
           </div>
 
           <div className="shrink-0 border-t border-border bg-mint/20 px-6 py-4">
-            <p className="text-center text-xs leading-relaxed text-muted-foreground">
+            <p className="text-center text-body-sm font-body leading-relaxed text-muted-foreground">
               Informasi ini bersifat edukasi dan bukan diagnosis medis.
             </p>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
   );
 }
 
@@ -169,6 +155,7 @@ function AnalyzePage({
   const [analyzed, setAnalyzed] = useState(false);
   const [riwayatId, setRiwayatId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
 
   const currentStep = file == null ? 0 : analyzed ? 2 : 1;
 
@@ -177,6 +164,18 @@ function AnalyzePage({
     setPreviewUrl(null);
     setAnalyzed(false);
     setRiwayatId(null);
+    setPredictions([]);
+  };
+
+  const fetchPredictions = async (id: number) => {
+    try {
+      const res = await api.riwayat.detail(id);
+      if (res.riwayat?.predictions) {
+        setPredictions(res.riwayat.predictions);
+      }
+    } catch (err) {
+      console.error("Failed to fetch predictions:", err);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,6 +213,7 @@ function AnalyzePage({
       const res = await api.riwayat.create(file);
       setRiwayatId(res.id);
       await api.analysis.run(res.id);
+      await fetchPredictions(res.id);
       setAnalyzed(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal mengunggah atau memulai analisis");
@@ -228,6 +228,7 @@ function AnalyzePage({
     setError(null);
     try {
       await api.analysis.run(riwayatId);
+      await fetchPredictions(riwayatId);
       setAnalyzed(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal menjalankan analisis kembali");
@@ -239,7 +240,7 @@ function AnalyzePage({
   if (uploading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-pine border-t-transparent" />
+        <div className="h-8 w-8 rounded-full border-4 border-pine border-t-transparent" />
       </div>
     );
   }
@@ -252,7 +253,7 @@ function AnalyzePage({
           Kembali
         </Button>
 
-        <span className="inline-flex items-center gap-2 rounded-full border border-pine/20 bg-pine/5 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-pine">
+        <span className="inline-flex items-center gap-2 rounded-full border border-pine/20 bg-pine/5 px-3 py-1 font-body text-ui font-medium text-pine">
           {bodyPartName ?? "Bagian tubuh"}
           <span aria-hidden="true">·</span>
           {analysis.name}
@@ -260,20 +261,16 @@ function AnalyzePage({
       </div>
 
       <header className="mt-6 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-pine">
-          {analysis.name}
-        </p>
-        <h1 className="mt-3 font-display text-3xl md:text-4xl font-medium text-ink tracking-tight text-balance">
+        <h1 className="text-h1 font-display text-ink tracking-tight text-balance">
           Unggah, lihat pratinjau, analisis.
         </h1>
-        <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground leading-relaxed text-pretty">
+        <p className="mx-auto mt-3 max-w-lg text-body font-body text-muted-foreground leading-relaxed text-pretty">
           {analysis.description} Hasil pada halaman ini bersifat edukasi dan
           tidak boleh dipakai untuk keputusan medis.
         </p>
       </header>
 
-      <FadeIn delay={0.1}>
-        <ol className="mt-8 flex flex-wrap items-center justify-center gap-y-2">
+        <ol className="mt-8 flex flex-wrap items-center justify-center gap-y-2" aria-label="Langkah analisis">
           {STEPS.map((step, i) => {
             const isDone = i < currentStep;
             const isActive = i === currentStep;
@@ -289,7 +286,7 @@ function AnalyzePage({
                 )}
                 <span className="flex items-center gap-1.5">
                   <span
-                    className={`flex h-6 w-6 items-center justify-center rounded-full border text-[11px] transition-colors ${
+                    className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs transition-colors ${
                       isDone
                         ? "border-pine bg-pine text-white"
                         : isActive
@@ -300,7 +297,7 @@ function AnalyzePage({
                     {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
                   </span>
                   <span
-                    className={`whitespace-nowrap font-mono text-xs ${
+                    className={`whitespace-nowrap font-body text-ui ${
                       isDone || isActive
                         ? "font-medium text-pine"
                         : "text-muted-foreground"
@@ -313,84 +310,75 @@ function AnalyzePage({
             );
           })}
         </ol>
-      </FadeIn>
 
-      <motion.section
-        layout
-        className="mt-6 rounded-xl border border-border bg-card p-6 shadow-sm"
-      >
-        <AnimatePresence mode="wait">
-          {previewUrl ? (
-            <motion.div
-              key="preview"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="relative overflow-hidden rounded-lg bg-background">
-                <img
-                  src={previewUrl}
-                  alt="Pratinjau gambar yang diunggah"
-                  className="mx-auto max-h-80 w-auto object-contain"
-                />
-                <button
-                  type="button"
-                  onClick={resetPreview}
-                  aria-label="Hapus gambar"
-                  className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white/90 text-muted-foreground shadow-sm transition-colors hover:text-red-600 hover:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
+        {(() => {
+          if (previewUrl) {
+            return (
+              <section className="mt-6 rounded-xl border border-border bg-card p-6 shadow-sm">
+                <div key="preview">
+                  <div className="relative overflow-hidden rounded-lg bg-background">
+                    <img
+                      src={previewUrl}
+                      alt="Pratinjau gambar yang diunggah"
+                      className="mx-auto max-h-80 w-auto object-contain"
+                    />
+                    <button
+                      type="button"
+                      onClick={resetPreview}
+                      aria-label="Hapus gambar"
+                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white/90 text-muted-foreground shadow-sm transition-colors hover:text-red-600 hover:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
 
-              <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                <span className="truncate font-mono">{file?.name}</span>
-                <span className="shrink-0 font-mono">
-                  {file ? `${(file.size / 1024).toFixed(1)} KB` : ""}
-                </span>
-              </div>
+                  <div className="mt-3 flex items-center justify-between gap-3 text-body-sm font-body text-muted-foreground">
+                    <span className="truncate font-mono">{file?.name}</span>
+                    <span className="shrink-0 font-mono">
+                      {file ? `${(file.size / 1024).toFixed(1)} KB` : ""}
+                    </span>
+                  </div>
 
-              <Button
+                  <Button
+                    type="button"
+                    onClick={handleUpload}
+                    disabled={analyzed}
+                    className="mt-4 w-full bg-pine text-white hover:bg-pine/90"
+                  >
+                    Mulai Analisis
+                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+              </section>
+            );
+          }
+          return (
+            <section className="mt-6 rounded-xl border border-border bg-card p-6 shadow-sm">
+              <button
+                key="upload"
                 type="button"
-                onClick={handleUpload}
-                disabled={analyzed}
-                className="mt-4 w-full bg-pine text-white hover:bg-pine/90"
+                onClick={() => {
+                  const input = document.getElementById(
+                    "file-input",
+                  ) as HTMLInputElement;
+                  input.value = "";
+                  input?.click();
+                }}
+                className="flex w-full flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-border bg-background py-14 text-center transition-colors hover:border-pine/40 hover:bg-mint/30 hover:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                Mulai Analisis
-                <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-              </Button>
-            </motion.div>
-          ) : (
-            <motion.button
-              key="upload"
-              type="button"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => {
-                const input = document.getElementById(
-                  "file-input",
-                ) as HTMLInputElement;
-                input.value = "";
-                input?.click();
-              }}
-              className="flex w-full flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-border bg-background py-14 text-center transition-colors hover:border-pine/40 hover:bg-mint/30 hover:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-mint text-pine">
-                <Upload className="h-6 w-6" aria-hidden="true" />
-              </span>
-              <span className="text-sm font-medium text-ink">
-                Klik untuk memilih gambar
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Format JPG, PNG, atau WEBP
-              </span>
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </motion.section>
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-mint text-pine">
+                  <Upload className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <span className="text-sm font-medium text-ink">
+                  Klik untuk memilih gambar
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Format JPG, PNG, atau WEBP
+                </span>
+              </button>
+            </section>
+          );
+        })()}
 
       <input
         id="file-input"
@@ -404,56 +392,91 @@ function AnalyzePage({
       />
 
       {analyzed && riwayatId !== null && (
-        <FadeIn delay={0.2}>
-          <motion.section
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="mt-6 rounded-xl border border-border bg-card p-6 shadow-sm"
-          >
-            <p className="font-mono text-xs uppercase tracking-widest text-pine">
-              Hasil Analisis
-            </p>
-            <h2 className="mt-2 font-display text-xl font-medium text-ink">
-              Analisis Selesai
-            </h2>
-            <p className="mt-4 text-sm text-muted-foreground">
-              Analisis telah selesai. Lihat detail hasil di bawah.
-            </p>
-            <div className="mt-4">
-              <Button
-                onClick={() => {
-                  navigate(`/riwayat/${riwayatId}`);
-                }}
-                className="w-full bg-pine text-white hover:bg-pine/90"
-              >
-                Lihat Detail Riwayat
-              </Button>
+        <section className="mt-6 rounded-xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-h4 font-display text-ink">
+            Analisis Selesai
+          </h2>
+          <p className="mt-4 text-body-sm font-body text-muted-foreground">
+            Analisis telah selesai. Hasil prediksi di bawah.
+          </p>
+          
+          {predictions.length > 0 && (
+            <div className="mt-6 space-y-4">
+              <h3 className="text-h4 font-display text-ink">Hasil Prediksi Model AI</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-ui font-body font-medium uppercase tracking-wider text-muted-foreground">Model</th>
+                      <th className="px-4 py-3 text-left text-ui font-body font-medium uppercase tracking-wider text-muted-foreground">Versi</th>
+                      <th className="px-4 py-3 text-left text-ui font-body font-medium uppercase tracking-wider text-muted-foreground">Penyakit</th>
+                      <th className="px-4 py-3 text-left text-ui font-body font-medium uppercase tracking-wider text-muted-foreground">Kode</th>
+                      <th className="px-4 py-3 text-left text-ui font-body font-medium uppercase tracking-wider text-muted-foreground">Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                    {predictions.map((p, idx) => (
+                      <tr key={p.id} className={idx % 2 === 0 ? "bg-muted/30" : "bg-transparent"}>
+                        <td className="px-4 py-3 text-body font-body text-foreground">{p.model}</td>
+                        <td className="px-4 py-3 text-body font-body text-foreground">{p.versi}</td>
+                        <td className="px-4 py-3 text-body font-body text-foreground">{p.penyakit}</td>
+                        <td className="px-4 py-3 text-body font-body text-foreground">{p.kode ?? "-"}</td>
+                        <td className="px-4 py-3 text-body font-mono">
+                          {p.confidence.toFixed(3)}
+                          <Badge 
+                            variant={
+                              p.confidence >= 0.8 ? "success" : 
+                              p.confidence >= 0.5 ? "warning" : "destructive"
+                            } 
+                            className="ml-2"
+                          >
+                            {p.confidence >= 0.8 ? "Tinggi" : p.confidence >= 0.5 ? "Sedang" : "Rendah"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-body-sm font-body text-muted-foreground">
+                Confidence menunjukkan tingkat keyakinan model pada prediksi tersebut.
+              </p>
             </div>
-            <p className="mt-4 text-sm text-muted-foreground">
-              Atau jalankan uji coba ulang dengan hasil yang mungkin berbeda.
+          )}
+
+          {predictions.length === 0 && (
+            <p className="mt-4 text-center text-muted-foreground py-8">
+              Belum ada hasil prediksi. Jalankan analisis terlebih dahulu.
             </p>
+          )}
+
+          <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={() => {
+                navigate(`/riwayat/${riwayatId}`);
+              }}
+              className="flex-1 bg-pine text-white hover:bg-pine/90"
+            >
+              Lihat Detail Riwayat
+            </Button>
             <Button
               onClick={handleReanalyze}
               disabled={analyzing}
-              className="mt-2 w-full bg-pine/20 text-pine hover:bg-pine/30"
+              className="flex-1 bg-pine/20 text-pine hover:bg-pine/30"
             >
               {analyzing ? "Menganalisis..." : "Uji Coba Analisis Kembali"}
             </Button>
-          </motion.section>
-        </FadeIn>
+          </div>
+        </section>
       )}
 
       {error && (
-        <FadeIn>
-          <div
-            role="alert"
-            className="mt-6 rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700"
-          >
-            {error}
-          </div>
-        </FadeIn>
+        <div
+          role="alert"
+          className="mt-6 rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700"
+        >
+          {error}
+        </div>
       )}
     </div>
   );
@@ -503,20 +526,15 @@ export default function AnalysisPage() {
         />
       ) : (
         <>
-          <FadeIn>
-            <section className="mb-6 text-center">
-              <p className="font-mono text-xs uppercase tracking-widest text-pine">
-                Analisis Gambar
-              </p>
-              <h1 className="mt-2 font-display text-3xl md:text-4xl font-medium text-ink tracking-tight text-balance">
-                Pilih bagian tubuh untuk dianalisis.
-              </h1>
-              <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground leading-relaxed text-pretty">
-                Ketuk area pada peta tubuh, lalu pilih jenis analisis yang
-                tersedia untuk bagian tersebut.
-              </p>
-            </section>
-          </FadeIn>
+          <section className="mb-6 text-center">
+            <h1 className="text-h1 font-display text-ink tracking-tight text-balance">
+              Pilih bagian tubuh untuk dianalisis.
+            </h1>
+            <p className="mx-auto mt-3 max-w-lg text-body font-body text-muted-foreground leading-relaxed text-pretty">
+              Ketuk area pada peta tubuh, lalu pilih jenis analisis yang
+              tersedia untuk bagian tersebut.
+            </p>
+          </section>
 
           <BodyMap
             selectedPartId={selectedPartId}

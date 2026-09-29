@@ -10,7 +10,7 @@ from app.services.embedding import generate_embedding
 
 # Operator `<=>` = cosine distance, jadi similarity = 1 - distance.
 # Karena konten dipecah jadi beberapa chunk per penyakit, `ROW_NUMBER` dipakai
-# untuk membatasiä¸Šä½ N chunk per penyakit -- tanpa itu, 5 hasil retrieval bisa
+# untuk membatasi N chunk per penyakit -- tanpa itu, 5 hasil retrieval bisa
 # semuanya berasal dari satu penyakit yang sama. FAQ (penyakit_id NULL)
 # dikelompokkan lewat -id agar tiap baris punya partisi sendiri; `PARTITION BY`
 # memperlakukan NULL sebagai satu kelompok, yang bila dibiarkan akan mengembalikan

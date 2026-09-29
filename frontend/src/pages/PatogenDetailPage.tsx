@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { FadeIn } from "@/components/FadeIn";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { MedicalDisclaimer } from "@/components/MedicalDisclaimer";
@@ -100,8 +99,7 @@ export function PatogenDetailPage() {
         <span className="font-medium">Kembali</span>
       </Button>
 
-      <FadeIn>
-        <header className="border-b border-border pb-6">
+      <header className="border-b border-border pb-6">
           <div className="flex items-center gap-2">
             <span className="rounded-md bg-pine/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-pine">
               {data.jenis}
@@ -123,7 +121,6 @@ export function PatogenDetailPage() {
             penyakit.
           </p>
         </header>
-      </FadeIn>
 
       <section className="mt-6">
         <h2 className="flex items-center gap-2.5 font-display text-xl md:text-2xl font-semibold tracking-tight text-ink">

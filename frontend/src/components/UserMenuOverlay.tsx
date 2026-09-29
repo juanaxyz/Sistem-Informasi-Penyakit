@@ -138,7 +138,7 @@ function OverlayContent({
 
       <div className="border-b border-border px-5 py-4 bg-background ">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="text-ui font-body font-semibold tracking-wider text-muted-foreground">
             Detail Profil
           </h2>
           <button
@@ -148,7 +148,7 @@ function OverlayContent({
               setError(null);
               setSuccess(null);
             }}
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-ink transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-ui font-body font-medium text-ink transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Pencil size={12} />
             {editing ? "Batal" : "Edit"}
@@ -160,7 +160,7 @@ function OverlayContent({
             <div>
               <label
                 htmlFor="ov-name"
-                className="mb-1 block text-xs font-medium text-muted-foreground"
+                className="mb-1 block text-ui font-body font-medium text-muted-foreground"
               >
                 Nama
               </label>
@@ -176,7 +176,7 @@ function OverlayContent({
             <div>
               <label
                 htmlFor="ov-email"
-                className="mb-1 block text-xs font-medium text-muted-foreground"
+                className="mb-1 block text-ui font-body font-medium text-muted-foreground"
               >
                 Email
               </label>
@@ -192,7 +192,7 @@ function OverlayContent({
             <div>
               <label
                 htmlFor="ov-username"
-                className="mb-1 block text-xs font-medium text-muted-foreground"
+                className="mb-1 block text-ui font-body font-medium text-muted-foreground"
               >
                 Username
               </label>
@@ -208,7 +208,7 @@ function OverlayContent({
             <div>
               <label
                 htmlFor="ov-password"
-                className="mb-1 block text-xs font-medium text-muted-foreground"
+                className="mb-1 block text-ui font-body font-medium text-muted-foreground"
               >
                 Password baru (opsional)
               </label>
@@ -224,12 +224,12 @@ function OverlayContent({
             </div>
 
             {error && (
-              <p className="text-xs text-red-600" role="alert">
+              <p className="text-body-sm font-body text-red-600" role="alert">
                 {error}
               </p>
             )}
             {success && (
-              <p className="text-xs text-green-700" role="status">
+              <p className="text-body-sm font-body text-green-700" role="status">
                 {success}
               </p>
             )}
@@ -237,7 +237,7 @@ function OverlayContent({
             <button
               type="submit"
               disabled={saving}
-              className="w-full rounded-lg bg-pine px-3 py-2.5 text-xs font-medium text-white transition hover:bg-pine/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-full rounded-lg bg-pine px-3 py-2.5 text-ui font-body font-medium text-white transition hover:bg-pine/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {saving ? "Menyimpan..." : "Simpan Perubahan"}
             </button>
@@ -245,22 +245,22 @@ function OverlayContent({
         ) : (
           <dl className="mt-4 space-y-3">
             <div>
-              <dt className="text-xs text-muted-foreground">Nama</dt>
-              <dd className="text-sm font-medium text-ink">{user.nama}</dd>
+              <dt className="text-body-sm font-body text-muted-foreground">Nama</dt>
+              <dd className="text-body font-body font-medium text-ink">{user.nama}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">Username</dt>
-              <dd className="text-sm font-medium text-ink">@{user.username}</dd>
+              <dt className="text-body-sm font-body text-muted-foreground">Username</dt>
+              <dd className="text-body font-body font-medium text-ink">@{user.username}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">Email</dt>
-              <dd className="text-sm font-medium text-ink">{user.email}</dd>
+              <dt className="text-body-sm font-body text-muted-foreground">Email</dt>
+              <dd className="text-body font-body font-medium text-ink">{user.email}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">Peran</dt>
-              <dd className="text-sm font-medium text-ink">
+              <dt className="text-body-sm font-body text-muted-foreground">Peran</dt>
+              <dd className="text-body font-body font-medium text-ink">
                 {user.role === "admin" ? (
-                  <span className="rounded bg-pine/10 px-1.5 py-0.5 text-[10px] font-mono text-pine">
+                  <span className="rounded bg-pine/10 px-1.5 py-0.5 text-ui font-body text-pine">
                     Admin
                   </span>
                 ) : (
@@ -279,7 +279,7 @@ function OverlayContent({
               <Link
                 to={item.to}
                 onClick={onClose}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-body font-body font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   item.active ? "bg-pine text-white" : "text-ink hover:bg-muted"
                 }`}
               >
@@ -295,7 +295,7 @@ function OverlayContent({
         <button
           type="button"
           onClick={onLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-body font-body font-medium text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <LogOut size={18} />
           Keluar

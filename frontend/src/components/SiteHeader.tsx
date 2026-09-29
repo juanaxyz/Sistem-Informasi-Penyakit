@@ -17,7 +17,7 @@ export function SiteHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   return (
-    <header className="border-b border-border bg-background/80 backdrop-blur sticky top-0 z-10">
+    <header className="border-b border-border bg-background/80 backdrop-blur sticky top-0 z-99">
       <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-3">
         <Link
           to="/"
@@ -46,12 +46,12 @@ export function SiteHeader() {
                 type="button"
                 onClick={() => setMenuOpen(true)}
                 title="Menu pengguna"
-                className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-ink transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-ui font-body font-medium text-ink transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <UserIcon size={14} className="text-pine" />
                 <span className="max-w-16 sm:max-w-24 truncate">{user.nama}</span>
                 {user.role === "admin" && (
-                  <span className="rounded bg-pine/10 px-1.5 py-0.2 text-[10px] font-mono text-pine">
+                  <span className="rounded bg-pine/10 px-1.5 py-0.2 text-xs font-body text-pine">
                     Admin
                   </span>
                 )}
@@ -79,13 +79,13 @@ export function SiteHeader() {
             <div className="flex items-center gap-2">
               <Link
                 to="/login"
-                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-muted"
+                className="rounded-lg border border-border bg-card px-3 py-1.5 text-ui font-body font-medium text-ink transition hover:bg-muted"
               >
                 Masuk
               </Link>
               <Link
                 to="/register"
-                className="rounded-lg bg-pine px-3 py-1.5 text-xs font-medium text-white transition hover:bg-pine/90"
+                className="rounded-lg bg-pine px-3 py-1.5 text-ui font-body font-medium text-white transition hover:bg-pine/90"
               >
                 Daftar
               </Link>

@@ -29,13 +29,13 @@ export default function App() {
   const items = [
     {
       icon: <House size={18} />,
-      label: "Home",
+      label: "Beranda",
       active: location.pathname === "/",
       onClick: () => navigate("/"),
     },
     {
       icon: <ScanSearch size={18} />,
-      label: "Body Map",
+      label: "Peta Tubuh",
       active: location.pathname.startsWith("/body-map"),
       onClick: () => navigate("/body-map"),
     },
@@ -45,18 +45,6 @@ export default function App() {
       active: location.pathname.startsWith("/analisis"),
       onClick: () => navigate("/analisis"),
     }
-    // {
-    //   icon: <FileText size={18} />,
-    //   label: "Riwayat",
-    //   active: location.pathname.startsWith("/riwayat"),
-    //   onClick: () => navigate("/riwayat"),
-    // },
-    // {
-    //   icon: <FileText size={18} />,
-    //   label: "Admin",
-    //   active: location.pathname.startsWith("/admin"),
-    //   onClick: () => navigate("/admin"),
-    // },
   ];
 
   return (
@@ -115,7 +103,7 @@ export default function App() {
       </div>
 
       <footer className="border-t border-border bg-muted/30 pt-4 pb-[max(5rem,env(safe-area-inset-bottom))] sm:py-4">
-        <p className="max-w-7xl mx-auto px-4 text-center text-sm text-muted-foreground font-mono">
+        <p className="max-w-7xl mx-auto px-4 text-center text-body-sm font-body text-muted-foreground">
           Informasi ini bersifat edukasi, bukan diagnosis medis. Konsultasikan
           dengan tenaga kesehatan untuk penanganan yang tepat.
         </p>

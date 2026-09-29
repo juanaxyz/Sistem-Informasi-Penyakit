@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { FadeIn } from "@/components/FadeIn";
 import { BodyMap } from "../components/bodyMap/BodyMap";
 import { ResultsPanel } from "../components/ResultsPanel";
 import { useBodyParts } from "../hooks/useBodyParts";
@@ -37,16 +36,11 @@ export function BodyMapPage() {
 
   return (
     <div>
-      <FadeIn>
-        <section className="mb-6 text-center">
-          <h1 className="font-display text-3xl md:text-4xl font-medium text-ink tracking-tight text-balance">
-            Tubuh Anda, <span className="text-pine">peta kesehatannya</span>.
-          </h1>
-          <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mt-1">
-            PETA INTERAKTIF — SISTEM TUBUH — PENCARIAN
-          </p>
-        </section>
-      </FadeIn>
+      <section className="mb-6 text-center">
+        <h1 className="text-h1 font-display text-ink tracking-tight text-balance">
+          Tubuh Anda, <span className="text-pine">peta kesehatannya</span>.
+        </h1>
+      </section>
 
       <div className="grid lg:grid-cols-11 gap-8 items-start mx-auto max-w-6xl">
         <div className="lg:col-span-6 lg:sticky lg:top-24 self-start">

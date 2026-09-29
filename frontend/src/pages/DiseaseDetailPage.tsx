@@ -2,13 +2,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDiseaseDetail } from "@/hooks/useDiseaseDetail";
 import { Button } from "@/components/ui/button";
-import { FadeIn } from "@/components/FadeIn";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { BodyPartPreview } from "@/components/BodyPartPreview";
 import { MedicalDisclaimer } from "@/components/MedicalDisclaimer";
-import { ArticleProse } from "@/components/ArticleProse";
+import { ArticleProse, TableOfContents, type TocItem } from "@/components/ArticleProse";
 
 /** Judul section artikel yang konsisten: display font + aksen bar pine di kiri. */
 function ArticleHeading({
@@ -23,7 +22,7 @@ function ArticleHeading({
   return (
     <h2
       id={id}
-      className="group/section flex items-center gap-2.5 scroll-mt-24 font-display text-xl md:text-2xl font-semibold tracking-tight text-ink"
+      className="group/section flex items-center gap-2.5 scroll-mt-24 text-h2 font-display text-ink"
     >
       <span
         aria-hidden="true"
@@ -103,38 +102,11 @@ function ReadingProgress() {
   );
 }
 
-const CustomTableComponents = {
-  table: ({ children }: any) => (
-    <div className="overflow-x-auto my-4 rounded-lg border border-gray-300 shadow-sm">
-      {/* Pastikan menggunakan border-collapse agar garis menyatu */}
-      <table className="w-full text-left text-sm border-collapse">
-        {children}
-      </table>
-    </div>
-  ),
-  thead: ({ children }: any) => (
-    <thead className="bg-primary text-xs uppercase font-semibold text-gray-700">
-      {children}
-    </thead>
-  ),
-  th: ({ children }: any) => (
-    /* Menggunakan border-r-2 dan warna gray-300 agar terlihat tegas */
-    <th className="px-6 py-3 border-r-2 bg-secondary border-gray-300 last:border-r-0 text-gray-700">
-      {children}
-    </th>
-  ),
-  td: ({ children }: any) => (
-    /* Menggunakan border-r-2 dan warna gray-200 untuk baris data */
-    <td className="px-6 py-4 border-r-2 border-gray-200 last:border-r-0 text-gray-600">
-      {children}
-    </td>
-  ),
-};
-
 export function DiseaseDetailPage() {
   const { slug } = useParams();
   const validSlug = slug && slug.trim() ? slug.trim() : null;
   const navigate = useNavigate();
+  const [tocItems, setTocItems] = useState<TocItem[]>([]);
 
   const { data, isLoading, error } = useDiseaseDetail(validSlug);
 
@@ -243,7 +215,6 @@ export function DiseaseDetailPage() {
 
       <div className="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
         <article className="min-w-0 max-w-3xl">
-          <FadeIn>
             <header className="border-b border-border pb-6 md:pb-8">
               <div className="flex flex-wrap items-center gap-2">
                 <UrgencyBadge disease={data} />
@@ -251,11 +222,11 @@ export function DiseaseDetailPage() {
                   <Badge variant="secondary">{data.sistem_tubuh.nama}</Badge>
                 )}
               </div>
-              <h1 className="mt-4 font-display text-3xl md:text-4xl font-medium tracking-tight text-ink text-balance">
+              <h1 className="mt-4 text-h1 font-display text-ink tracking-tight text-balance">
                 {data.nama}
               </h1>
               {data.ringkasan && (
-                <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground text-pretty">
+                <p className="mt-3 max-w-2xl text-body font-body leading-relaxed text-muted-foreground text-pretty">
                   {data.ringkasan}
                 </p>
               )}
@@ -265,7 +236,7 @@ export function DiseaseDetailPage() {
                     <Link
                       key={pg.id}
                       to={`/patogen/${pg.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-ink transition hover:border-pine/40 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-ui font-body font-medium text-ink transition hover:border-pine/40 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <span
                         aria-hidden="true"
@@ -277,7 +248,6 @@ export function DiseaseDetailPage() {
                 </div>
               )}
             </header>
-          </FadeIn>
           {data.artikel.length > 0 && (
             <div className="mt-6 space-y-8">
               {data.artikel.map((article) =>
@@ -298,7 +268,10 @@ export function DiseaseDetailPage() {
                             `prose` di sini: plugin typography tidak terpasang,
                             jadi kelas itu tidak melakukan apa pun.
                           */}
-                          <ArticleProse components={CustomTableComponents}>
+                          <ArticleProse
+                            enableToc
+                            onTocChange={setTocItems}
+                          >
                             {sec.konten}
                           </ArticleProse>
                         </section>
@@ -310,81 +283,74 @@ export function DiseaseDetailPage() {
             </div>
           )}
           {data.bagian_tubuh.length > 0 && (
-            <FadeIn>
-              <section className="mt-8 md:mt-10">
-                <ArticleHeading>Bagian tubuh terkait</ArticleHeading>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {data.bagian_tubuh.map((part) => (
-                    <Badge key={part.id} variant="outline">
-                      {part.nama}
-                    </Badge>
-                  ))}
-                </div>
-              </section>
-            </FadeIn>
+            <section className="mt-8 md:mt-10">
+              <ArticleHeading>Bagian tubuh terkait</ArticleHeading>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {data.bagian_tubuh.map((part) => (
+                  <Badge key={part.id} variant="outline">
+                    {part.nama}
+                  </Badge>
+                ))}
+              </div>
+            </section>
           )}
           {data.patogen && data.patogen.length > 0 && (
-            <FadeIn>
-              <section className="mt-8 md:mt-10">
-                <ArticleHeading>Patogen penyebab</ArticleHeading>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {data.patogen.map((pg) => (
-                    <Link
-                      key={pg.id}
-                      to={`/patogen/${pg.id}`}
-                      className="rounded-xl border border-border bg-card p-4 transition hover:border-pine/40 hover:shadow-sm"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-md bg-pine/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-pine">
-                          {pg.jenis}
-                        </span>
-                        <h3 className="font-medium text-ink">{pg.nama}</h3>
-                      </div>
-                      {pg.deskripsi && (
-                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground line-clamp-3">
-                          {pg.deskripsi}
-                        </p>
-                      )}
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            </FadeIn>
+            <section className="mt-8 md:mt-10">
+              <ArticleHeading>Patogen penyebab</ArticleHeading>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {data.patogen.map((pg) => (
+                  <Link
+                    key={pg.id}
+                    to={`/patogen/${pg.id}`}
+                    className="rounded-xl border border-border bg-card p-4 transition hover:border-pine/40 hover:shadow-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-md bg-pine/10 px-2 py-0.5 font-body text-xs uppercase tracking-wide text-pine">
+                        {pg.jenis}
+                      </span>
+                      <h3 className="text-h4 font-display text-ink">{pg.nama}</h3>
+                    </div>
+                    {pg.deskripsi && (
+                      <p className="mt-2 text-body-sm font-body leading-relaxed text-muted-foreground line-clamp-3">
+                        {pg.deskripsi}
+                      </p>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </section>
           )}
           {data.referensi.length > 0 && (
-            <FadeIn>
-              <section className="mt-10 border-t border-border pt-6">
-                <ArticleHeading>Referensi</ArticleHeading>
-                <ul className="mt-4 space-y-2">
-                  {data.referensi.map((ref) => (
-                    <li key={ref.id} className="text-sm">
-                      {ref.url ? (
-                        <a
-                          href={ref.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-pine hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
-                        >
-                          {ref.url}
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </FadeIn>
+            <section className="mt-10 border-t border-border pt-6">
+              <ArticleHeading>Referensi</ArticleHeading>
+              <ul className="mt-4 space-y-2">
+                {data.referensi.map((ref) => (
+                  <li key={ref.id} className="text-body-sm font-body">
+                    {ref.url ? (
+                      <a
+                        href={ref.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-pine hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+                      >
+                        {ref.url}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
           <div className="mt-8 md:mt-10">
             <MedicalDisclaimer />
           </div>
         </article>
-        <FadeIn delay={0.15}>
-          <aside className="order-first lg:order-none lg:sticky lg:top-20">
-            <BodyPartPreview ids={data.bagian_tubuh.map((part) => part.id)} />
-          </aside>
-        </FadeIn>
+        <aside className="order-first lg:order-none lg:sticky lg:top-20 space-y-8">
+          <TableOfContents items={tocItems} />
+          <BodyPartPreview ids={data.bagian_tubuh.map((part) => part.id)} />
+        </aside>
       </div>
     </div>
   );
