@@ -32,6 +32,35 @@ app = FastAPI(title="Web Paru-Paru Service API", version="2.0.0")
 registry = load_registry(MODELS)
 
 
+@app.get("/v1/models")
+def list_models():
+    """Expose configured model identifiers for OpenAI-compatible clients."""
+    models = [
+        {
+            "id": GENERATION_MODEL,
+            "object": "model",
+            "created": 0,
+            "owned_by": "google",
+        },
+        {
+            "id": EMBEDDING_MODEL,
+            "object": "model",
+            "created": 0,
+            "owned_by": "local",
+        },
+    ]
+    models.extend(
+        {
+            "id": model.config["id"],
+            "object": "model",
+            "created": 0,
+            "owned_by": "local",
+        }
+        for model in registry
+    )
+    return {"object": "list", "data": models}
+
+
 @app.get("/")
 def root():
     return {"message": "Service API is running"}

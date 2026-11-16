@@ -66,7 +66,7 @@ Gemini hanya dipakai pada langkah 4 (menyusun jawaban), tidak untuk embedding.
 ```
 service/
 ├── app/
-│   ├── main.py            # FastAPI: /api/rag/chat, /api/prediksi, /, /health
+│   ├── main.py            # FastAPI: /v1/models, /api/rag/chat, /api/prediksi, /, /health
 │   ├── config.py          # konstanta RAG + PG* + registri model citra (MODELS)
 │   ├── db.py              # connection pool psycopg (singleton)
 │   ├── schemas/
@@ -168,6 +168,7 @@ Endpoint:
 | --- | --- | --- | --- |
 | GET | `/` | — | Health check / versi |
 | GET | `/health` | — | Status RAG (`gemini_configured`, `database`) + status tiap model citra |
+| GET | `/v1/models` | — | Daftar model yang dikonfigurasi (format OpenAI model-list) |
 | POST | `/api/rag/chat` | `{ "question", "session_id?", "history?" }` | Jawaban + `sources` |
 | POST | `/api/prediksi` | multipart `image` | 3 prediksi + `stub` flag |
 

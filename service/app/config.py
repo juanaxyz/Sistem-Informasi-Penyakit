@@ -104,6 +104,7 @@ MODELS = [
             "Nodule",
             "Lung Opacity",
             "Normal",
+            "PULMONARY-EDEMA"
         ],
     },
     {
@@ -120,6 +121,7 @@ MODELS = [
             "Nodule",
             "Lung Opacity",
             "Normal",
+            "PULMONARY-EDEMA"
         ],
     },
     {
@@ -136,6 +138,7 @@ MODELS = [
             "Nodule",
             "Lung Opacity",
             "Normal",
+            "PULMONARY-EDEMA"
         ],
     },
 ]
