@@ -18,9 +18,7 @@ supaya tiap vektor berisi satu gagasan utuh dan muat dalam batas input model.
 """
 
 import hashlib
-import re
 import time
-from html import unescape
 
 import psycopg
 from psycopg.rows import dict_row
@@ -63,19 +61,6 @@ class IngestError(RuntimeError):
     """Kegagalan yang layak ditampilkan ke admin (bukan 500 generik)."""
 
 
-# Stopgap: konten artikel disimpan sebagai HTML sejak editor Quill aktif,
-# sementara artikel lama masih Markdown polos. Tag dibuang sebelum chunking
-# agar embedding tidak penuh markup. Akan diganti pembacaan
-# `konten_plaintext` saat skema v2 diterapkan.
-_TAG_RE = re.compile(r"<[^>]+>")
-
-
-def strip_html(text: str) -> str:
-    if "<" not in text:
-        return text
-    return unescape(_TAG_RE.sub(" ", text))
-
-
 def content_sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -101,7 +86,7 @@ def _plan_rows(conn: psycopg.Connection, tokenizer) -> list[dict]:
     planned: list[dict] = []
 
     for row in conn.execute(DISEASE_SQL).fetchall():
-        raw = strip_html((row["konten"] or "").strip())
+        raw = (row["konten"] or "").strip()
         source_hash = content_sha256(f"{row['nama_penyakit']}\n{row['judul'] or ''}\n{raw}")
         pieces = chunk_text(raw, tokenizer, header=_disease_header(row))
         bagian_tubuh = row["bagian_tubuh"] if row["bagian_tubuh"] else []
