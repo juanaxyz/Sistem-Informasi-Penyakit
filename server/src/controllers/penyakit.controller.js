@@ -63,6 +63,30 @@ const handleSearchPenyakit = async (req, res) => {
   res.json({ penyakit: rows });
 };
 
+/**
+ * Daftar penyakit terbaru untuk etalase beranda. Tidak terikat satu sistem
+ * tubuh tertentu supaya beranda tetap relevan ketika data penyakit dari
+ * sistem lain ditambahkan.
+ */
+const handleGetPenyakitTerbaru = async (req, res) => {
+  const rawLimit = Number.parseInt(String(req.query.limit ?? "6"), 10);
+  const limit = Number.isNaN(rawLimit)
+    ? 6
+    : Math.min(Math.max(rawLimit, 1), 12);
+
+  const { rows } = await query(
+    `SELECT p.id, p.nama, p.slug, p.ringkasan, p.thumbnail,
+            p.tingkat_urgensi, st.nama AS sistem_tubuh_nama
+     FROM penyakit p
+     LEFT JOIN sistem_tubuh st ON st.id = p.id_sistem_tubuh
+     ORDER BY p.id DESC
+     LIMIT $1`,
+    [limit],
+  );
+  res.json({ penyakit: rows });
+};
+
+
 const handleGetArtikelKonten = async (req, res) => {
   const idPenyakit = validateId(req.params.idPenyakit);
   if (idPenyakit === null) throw new AppError("id penyakit tidak valid", 400);
@@ -206,6 +230,7 @@ module.exports = {
   handleGetSistemTubuhByBody,
   handleGetPenyakitBySystemAndBody,
   handleSearchPenyakit,
+  handleGetPenyakitTerbaru,
   handleGetArtikelKonten,
   handleGetPenyakitDetail,
   handleGetPenyakitBySlug,

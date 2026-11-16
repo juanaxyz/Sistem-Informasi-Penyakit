@@ -5,6 +5,7 @@ const {
   handleGetSistemTubuhByBody,
   handleGetPenyakitBySystemAndBody,
   handleSearchPenyakit,
+  handleGetPenyakitTerbaru,
   handleGetArtikelKonten,
   handleGetPenyakitDetail,
   handleGetPenyakitBySlug,
@@ -20,6 +21,7 @@ router.get(
   asyncHandler(handleGetPenyakitBySystemAndBody),
 );
 router.get("/penyakit/cari", asyncHandler(handleSearchPenyakit));
+router.get("/penyakit/terbaru", asyncHandler(handleGetPenyakitTerbaru));
 router.get("/penyakit/:idPenyakit/konten", asyncHandler(handleGetArtikelKonten));
 router.get("/penyakit/:idOrSlug", asyncHandler(handleGetPenyakitDetail));
 router.get("/penyakit/slug/:slug", asyncHandler(handleGetPenyakitBySlug));
