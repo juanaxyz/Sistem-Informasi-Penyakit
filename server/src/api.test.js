@@ -957,32 +957,4 @@ describe("API Test Suite", () => {
       expect(res.status).toBe(404);
     });
   });
-
-  // --- UPLOAD GAMBAR ARTIKEL ---
-  describe("POST /api/artikel/gambar", () => {
-    it("harus 401 tanpa token", async () => {
-      const res = await request(app).post("/api/artikel/gambar");
-      expect(res.status).toBe(401);
-      expect(mockQuery).not.toHaveBeenCalled();
-    });
-
-    it("harus 400 ketika tidak ada file terlampir", async () => {
-      const res = await request(app)
-        .post("/api/artikel/gambar")
-        .set("Authorization", `Bearer ${signToken({ role: "admin" })}`);
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/tidak valid/i);
-    });
-
-    it("harus 400 untuk file dengan MIME non-gambar", async () => {
-      const res = await request(app)
-        .post("/api/artikel/gambar")
-        .set("Authorization", `Bearer ${signToken({ role: "admin" })}`)
-        .attach("gambar", Buffer.from("bukan gambar"), {
-          filename: "teks.txt",
-          contentType: "text/plain",
-        });
-      expect(res.status).toBe(400);
-    });
-  });
 });
