@@ -18,7 +18,8 @@
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "sanitize-html": "^2.18.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -28,5 +29,8 @@
     "nodemon": "^3.1.14",
     "supertest": "^7.2.2",
     "tsx": "^4.19.2"
+  },
+  "overrides": {
+    "htmlparser2": "^9.1.0"
   }
 }

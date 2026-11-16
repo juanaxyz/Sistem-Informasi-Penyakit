@@ -1,5 +1,6 @@
 const { query } = require("../db/pg");
 const { validateId } = require("../utils/validators");
+const { sanitizeKonten } = require("../utils/html");
 const AppError = require("../utils/AppError");
 
 const handleGetArtikelList = async (_req, res) => {
@@ -83,7 +84,7 @@ const handleUpdateArtikel = async (req, res) => {
      SET konten = $2, diperbarui_pada = CURRENT_TIMESTAMP
      FROM first_bagian fb
      WHERE ab.id = fb.id`,
-    [idArtikel, konten],
+    [idArtikel, sanitizeKonten(konten)],
   );
 
   const { rows } = await query(
@@ -141,7 +142,9 @@ const handleSaveArtikelBagian = async (req, res) => {
     const b = bagian[i];
     const urutan = b.urutan ?? i + 1;
     const judul = b.judul ?? null;
-    const konten = b.konten ?? "";
+    // HTML konten disanitasi di server: admin panel bukan sumber kepercayaan
+    // untuk tag/atribut yang disimpan.
+    const konten = sanitizeKonten(b.konten ?? "");
     const tipe = b.tipe ?? "lainnya";
 
     if (b.id && currentIds.includes(b.id)) {

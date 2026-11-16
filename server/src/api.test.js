@@ -958,9 +958,102 @@ describe("API Test Suite", () => {
     });
   });
 
+  // --- SANITASI HTML KONTEN ARTIKEL ---
+  describe("PUT /api/artikel/:idArtikel/bagian (sanitasi HTML)", () => {
+    const token = signToken({ role: "admin" });
+
+    it("harus membuang tag/atribut di luar allowlist", async () => {
+      // Bagian ber-id 1 sudah ada -> controller ambil jalur UPDATE.
+      mockQuery.mockResolvedValueOnce(ok([{ id: 1 }]));
+      mockQuery.mockResolvedValue(ok([{ id: 1, konten: "" }]));
+
+      const res = await request(app)
+        .put("/api/artikel/1/bagian")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          bagian: [
+            {
+              id: 1,
+              judul: "Gejala",
+              tipe: "gejala",
+              urutan: 1,
+              konten:
+                '<p>teks <script>alert(1)</script><span class="x">biasa</span> <strong>tebal</strong></p>',
+            },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      const updateCall = mockQuery.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].includes("UPDATE artikel_bagian"),
+      );
+      // c = [sql, params]; params UPDATE: [judul, konten, tipe, urutan, id]
+      expect(updateCall[1][1]).toContain("<p>teks biasa <strong>tebal</strong></p>");
+      expect(updateCall[1][1]).not.toContain("script");
+      expect(updateCall[1][1]).not.toContain("span");
+    });
+
+    it("harus membuang gambar dari sumber eksternal", async () => {
+      mockQuery.mockResolvedValueOnce(ok([]));
+      mockQuery.mockResolvedValue(ok([{ id: 1, konten: "" }]));
+
+      const res = await request(app)
+        .put("/api/artikel/1/bagian")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          bagian: [
+            {
+              judul: null,
+              tipe: "lainnya",
+              urutan: 1,
+              konten:
+                '<p>lihat <img src="https://evil.example/tracker.png" alt="x"></p>',
+            },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      const insertCall = mockQuery.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO artikel_bagian"),
+      );
+      // c = [sql, params]; params INSERT: [idArtikel, judul, konten, tipe, urutan]
+      expect(insertCall[1][2]).not.toContain("img");
+      expect(insertCall[1][2]).not.toContain("evil.example");
+    });
+
+    it("harus mempertahankan gambar internal /uploads dan menyandang rel noopener", async () => {
+      mockQuery.mockResolvedValueOnce(ok([]));
+      mockQuery.mockResolvedValue(ok([{ id: 1, konten: "" }]));
+
+      const res = await request(app)
+        .put("/api/artikel/1/bagian")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          bagian: [
+            {
+              judul: null,
+              tipe: "lainnya",
+              urutan: 1,
+              konten:
+                '<p><img src="/uploads/abc.png" alt="paru"> <a href="https://www.who.int/x">WHO</a></p>',
+            },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      const insertCall = mockQuery.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO artikel_bagian"),
+      );
+      expect(insertCall[1][2]).toContain('src="/uploads/abc.png"');
+      expect(insertCall[1][2]).toContain('alt="paru"');
+      expect(insertCall[1][2]).toContain(
+        'href="https://www.who.int/x" rel="noopener noreferrer"',
+      );
+    });
+  });
+
   // --- UPLOAD GAMBAR ARTIKEL ---
-  describe("POST /api/artikel/gambar", () => {
-    it("harus 401 tanpa token", async () => {
+  describe("POST /api/artikel/gambar", () => {    it("harus 401 tanpa token", async () => {
       const res = await request(app).post("/api/artikel/gambar");
       expect(res.status).toBe(401);
       expect(mockQuery).not.toHaveBeenCalled();
