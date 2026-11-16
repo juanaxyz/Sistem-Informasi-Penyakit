@@ -181,10 +181,22 @@ const handleSaveArtikelBagian = async (req, res) => {
   res.json({ bagian: finalRows });
 };
 
+/** Unggah gambar sisipan konten artikel. File sudah tervalidasi di multer. */
+const handleUploadBagianGambar = async (req, res) => {
+  if (!req.file) {
+    throw new AppError(
+      "Gambar tidak valid. Format png/jpg/webp/gif, ukuran maksimal 5 MB.",
+      400,
+    );
+  }
+  res.status(201).json({ url: `/uploads/${req.file.filename}` });
+};
+
 module.exports = {
   handleGetArtikelList,
   handleCreateArtikel,
   handleUpdateArtikel,
   handleGetArtikelBagian,
   handleSaveArtikelBagian,
+  handleUploadBagianGambar,
 };
