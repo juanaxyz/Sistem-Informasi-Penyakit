@@ -743,3 +743,16 @@
   background-color: color-mix(in oklab, var(--urgency-darurat) 18%, white);
   color: color-mix(in oklab, var(--urgency-darurat) 70%, black);
 }
+
+/* Editor Quill di admin panel. Hanya min-height + sudut yang diatur; sisanya
+   diatur quill.snow.css. */
+.quill-body .ql-editor {
+  min-height: 280px;
+  font-size: 0.875rem;
+}
+.quill-body .ql-toolbar {
+  border-radius: 0.375rem 0.375rem 0 0;
+}
+.quill-body .ql-container {
+  border-radius: 0 0 0.375rem 0.375rem;
+}
