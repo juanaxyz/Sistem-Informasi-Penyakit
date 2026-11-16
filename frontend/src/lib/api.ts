@@ -8,7 +8,6 @@ import type {
   ChatTurn,
   Disease,
   DiseaseDetail,
-  DiseaseListItem,
   LoginPayload,
   Model,
   Patogen,
@@ -185,8 +184,6 @@ export const api = {
       get<{ penyakit: Disease[] }>(`/api/penyakit/bySystemAndBody/${idBody}/${idSystem}`),
     searchDiseases: (q: string) =>
       get<{ penyakit: Disease[] }>(`/api/penyakit/cari?q=${encodeURIComponent(q)}`),
-    getPenyakitTerbaru: (limit = 6) =>
-      get<{ penyakit: DiseaseListItem[] }>(`/api/penyakit/terbaru?limit=${limit}`),
     getAllPenyakit: () => get<{ penyakit: (Disease & { id_sistem_tubuh: number; sistem_tubuh_nama?: string; code?: string })[] }>("/api/penyakit"),
     getDiseaseDetail: (id: number) =>
       get<{ penyakit: DiseaseDetail }>(`/api/penyakit/${id}`),
@@ -210,15 +207,6 @@ export const api = {
       get<{ bagian: ArtikelBagian[] }>(`/api/artikel/${idArtikel}/bagian`),
     saveArtikelBagian: (idArtikel: number, bagian: ArtikelBagian[]) =>
       put<{ bagian: ArtikelBagian[] }>(`/api/artikel/${idArtikel}/bagian`, { bagian }),
-    /**
-     * Unggah gambar untuk disisipkan ke konten artikel. Mengembalikan URL
-     * relatif (`/uploads/...`) yang disimpan apa adanya di HTML konten.
-     */
-    uploadBagianGambar: (file: File) => {
-      const form = new FormData();
-      form.append("gambar", file);
-      return postForm<{ url: string }>("/api/artikel/gambar", form);
-    },
     getDiseaseDetailById: (id: number) =>
       get<{ penyakit: DiseaseDetail }>(`/api/penyakit/${id}`),
     getDiseaseDetailBySlug: (slug: string) =>

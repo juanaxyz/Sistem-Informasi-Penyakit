@@ -11,9 +11,5 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    // Gambar `/uploads/...` dari BFF tampil di editor Quill saat pengembangan.
-    proxy: {
-      '/uploads': 'http://localhost:4000',
-    },
   },
 })

@@ -1,10 +1,11 @@
-import React, { lazy, Suspense, useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
+import { ArticleProse } from "@/components/ArticleProse";
 import Dashboard from "./AdminDashboard";
 import { BodyMap } from "@/components/bodyMap/BodyMap";
 import type {
@@ -37,11 +38,30 @@ interface ArtikelListItem {
   penyakit_nama: string;
 }
 
-// Editor Quill (~200 KB) hanya dipakai admin; pisahkan chunknya supaya
-// rute publik tidak ikut memuatnya.
-const QuillEditor = lazy(() =>
-  import("@/components/QuillEditor").then((m) => ({ default: m.QuillEditor })),
-);
+/** Tombol kecil di toolbar formatting Markdown. */
+function ToolbarButton({
+  label,
+  title,
+  onClick,
+  children,
+}: {
+  label: string;
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={label}
+      className="flex h-6 min-w-6 items-center justify-center rounded px-1.5 text-ink transition hover:bg-pine/10 hover:text-pine focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function Admin() {
   const { user } = useAuth();
@@ -119,6 +139,10 @@ export default function Admin() {
   const referensiDirty =
     referensiList.length !== referensiSaved.length ||
     referensiList.some((url, i) => url !== referensiSaved[i]);
+
+  // Editor Markdown: pratinjau per bagian + akses ke textarea untuk toolbar.
+  const [previewBagian, setPreviewBagian] = useState<number | null>(null);
+  const bagianRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -692,6 +716,60 @@ export default function Admin() {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
       return next;
+    });
+  };
+
+  /**
+   * Terapkan pembungkus Markdown (mis. `**tebal**`) pada pilihan kursor.
+   * Kalau tidak ada teks yang dipilih, sisipkan `placeholder` sebagai contoh
+   * supaya admin langsung tahu formatnya.
+   */
+  const applyMarkdownWrap = (
+    index: number,
+    before: string,
+    after: string,
+    placeholder: string,
+  ) => {
+    const el = bagianRefs.current[index];
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const current = bagianList[index]?.konten ?? "";
+    const selected = current.slice(start, end) || placeholder;
+    const next =
+      current.slice(0, start) + before + selected + after + current.slice(end);
+    handleBagianChange(index, "konten", next);
+    requestAnimationFrame(() => {
+      el.focus();
+      // Kursor ditaruh di dalam placeholder agar mudah diketik setelahnya.
+      const caret = start + before.length;
+      el.setSelectionRange(caret, caret + selected.length);
+    });
+  };
+
+  /**
+   * Terapkan awalan baris (mis. `## ` atau `- `) ke setiap baris yang sedang
+   * dipilih. Kalau tidak ada pilihan, sisipkan satu baris baru di akhir konten.
+   */
+  const applyMarkdownLine = (index: number, prefix: string) => {
+    const el = bagianRefs.current[index];
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const current = bagianList[index]?.konten ?? "";
+    const next =
+      end > start
+        ? current
+            .slice(0, start)
+            .split("\n")
+            .map((line) => prefix + line)
+            .join("\n") + current.slice(end)
+        : `${current}${current.length > 0 ? "\n" : ""}${prefix}`;
+    handleBagianChange(index, "konten", next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const caret = next.length;
+      el.setSelectionRange(caret, caret);
     });
   };
 
@@ -1361,25 +1439,115 @@ export default function Admin() {
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                        Konten
-                      </label>
-                      <Suspense
-                        fallback={
-                          <div className="h-64 animate-pulse rounded-md border border-border bg-muted/30" />
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label className="block text-xs font-medium text-muted-foreground">
+                          Konten Markdown
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setPreviewBagian((prev) =>
+                              prev === idx ? null : idx,
+                            )
+                          }
+                          aria-pressed={previewBagian === idx}
+                          className="h-6 px-2 text-[11px] text-muted-foreground hover:text-pine"
+                        >
+                          {previewBagian === idx
+                            ? "Sembunyikan pratinjau"
+                            : "Pratinjau"}
+                        </Button>
+                      </div>
+
+                      {/* Toolbar formatting: admins tidak perlu menghafal sintaks. */}
+                      <div className="mb-1.5 flex flex-wrap items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1">
+                        <ToolbarButton
+                          label="Tebal"
+                          title="Tebal (Ctrl+B)"
+                          onClick={() =>
+                            applyMarkdownWrap(idx, "**", "**", "teks tebal")
+                          }
+                        >
+                          <span className="font-bold text-xs">B</span>
+                        </ToolbarButton>
+                        <ToolbarButton
+                          label="Miring"
+                          title="Miring (Ctrl+I)"
+                          onClick={() =>
+                            applyMarkdownWrap(idx, "_", "_", "teks miring")
+                          }
+                        >
+                          <span className="italic font-serif text-xs">I</span>
+                        </ToolbarButton>
+                        <ToolbarButton
+                          label="Subjudul"
+                          title="Subjudul (##)"
+                          onClick={() => applyMarkdownLine(idx, "## ")}
+                        >
+                          <span className="text-xs font-semibold">H2</span>
+                        </ToolbarButton>
+                        <ToolbarButton
+                          label="Daftar"
+                          title="Daftar berbutir (-)"
+                          onClick={() => applyMarkdownLine(idx, "- ")}
+                        >
+                          <span className="text-xs">•</span>
+                        </ToolbarButton>
+                        <ToolbarButton
+                          label="Tautan"
+                          title="Tautan ([teks](url))"
+                          onClick={() =>
+                            applyMarkdownWrap(
+                              idx,
+                              "[",
+                              "](https://)",
+                              "teks tautan",
+                            )
+                          }
+                        >
+                          <span className="text-xs underline">Tautan</span>
+                        </ToolbarButton>
+                        <span className="ml-auto pr-1 text-[10px] text-muted-foreground">
+                          Markdown
+                        </span>
+                      </div>
+
+                      <div
+                        className={
+                          previewBagian === idx
+                            ? "grid gap-3 lg:grid-cols-2"
+                            : ""
                         }
                       >
-                        <QuillEditor
+                        <textarea
+                          ref={(el) => {
+                            bagianRefs.current[idx] = el;
+                          }}
+                          rows={previewBagian === idx ? 18 : 16}
                           value={b.konten || ""}
-                          onChange={(html) =>
-                            handleBagianChange(idx, "konten", html)
+                          onChange={(e) =>
+                            handleBagianChange(idx, "konten", e.target.value)
                           }
-                          penyakitOptions={penyakitList.map((p) => ({
-                            slug: p.slug,
-                            nama: p.nama,
-                          }))}
+                          placeholder="Tuliskan isi edukasi. Pilih teks lalu gunakan tombol di atas untuk menebalkan, membuat subjudul, daftar, atau tautan."
+                          className="w-full rounded-md border border-border bg-background p-3 text-sm font-sans text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                         />
-                      </Suspense>
+                        {previewBagian === idx && (
+                          <div className="rounded-md border border-border bg-background/50 p-3">
+                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Pratinjau
+                            </p>
+                            {b.konten ? (
+                              <ArticleProse>{b.konten}</ArticleProse>
+                            ) : (
+                              <p className="text-xs italic text-muted-foreground">
+                                Belum ada konten untuk ditampilkan.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
