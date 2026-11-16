@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDiseaseDetail } from "@/hooks/useDiseaseDetail";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { BodyPartPreview } from "@/components/BodyPartPreview";
 import { MedicalDisclaimer } from "@/components/MedicalDisclaimer";
-import { ArticleProse, TableOfContents, type TocItem } from "@/components/ArticleProse";
+import { ArticleProse, TableOfContents } from "@/components/ArticleProse";
+import { AnimatePresence, motion } from "motion/react";
+import { ChevronRight, List as ListIcon, X } from "lucide-react";
 
 /** Judul section artikel yang konsisten: display font + aksen bar pine di kiri. */
 function ArticleHeading({
@@ -106,7 +108,7 @@ export function DiseaseDetailPage() {
   const { slug } = useParams();
   const validSlug = slug && slug.trim() ? slug.trim() : null;
   const navigate = useNavigate();
-  const [tocItems, setTocItems] = useState<TocItem[]>([]);
+  const [mobileTocOpen, setMobileTocOpen] = useState(false);
 
   const { data, isLoading, error } = useDiseaseDetail(validSlug);
 
@@ -124,6 +126,20 @@ export function DiseaseDetailPage() {
       navigate("/");
     }
   };
+
+  const tocItems = useMemo(() => {
+    if (!data) return [];
+    const items: { id: string; text: string; level: number }[] = [];
+    data.artikel.forEach((article) => {
+      article.bagian?.forEach((sec) => {
+        if (sec.judul) {
+          const anchorId = `bagian-${sec.id ?? sec.urutan}`;
+          items.push({ id: anchorId, text: sec.judul, level: 2 });
+        }
+      });
+    });
+    return items;
+  }, [data]);
 
   if (isLoading) {
     return (
@@ -190,28 +206,79 @@ export function DiseaseDetailPage() {
   return (
     <div className="space-y-4">
       <ReadingProgress />
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleBack}
-        className="gap-1 px-2"
-      >
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleBack}
+          className="gap-1 px-2"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 19l-7-7 7-7"
-          />
-        </svg>
-        <span className="font-medium">Kembali</span>
-      </Button>
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          <span className="font-medium">Kembali</span>
+        </Button>
+        {tocItems.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="lg:hidden gap-1"
+            onClick={() => setMobileTocOpen(true)}
+          >
+            <ListIcon className="h-4 w-4" />
+            <span>Daftar Isi</span>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {mobileTocOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/40 lg:hidden"
+            onClick={() => setMobileTocOpen(false)}
+          >
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 260 }}
+              className="absolute right-0 top-0 flex h-full w-80 max-w-[85vw] flex-col bg-background shadow-xl border-l border-border"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-border p-4">
+                <h3 className="font-display font-semibold text-ink">Daftar Isi</h3>
+                <button
+                  type="button"
+                  onClick={() => setMobileTocOpen(false)}
+                  className="rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-ink"
+                  aria-label="Tutup daftar isi"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                <TableOfContents items={tocItems} onNavigate={() => setMobileTocOpen(false)} />
+                <BodyPartPreview ids={data.bagian_tubuh.map((part) => part.id)} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
         <article className="min-w-0 max-w-3xl">
@@ -268,12 +335,7 @@ export function DiseaseDetailPage() {
                             `prose` di sini: plugin typography tidak terpasang,
                             jadi kelas itu tidak melakukan apa pun.
                           */}
-                          <ArticleProse
-                            enableToc
-                            onTocChange={setTocItems}
-                          >
-                            {sec.konten}
-                          </ArticleProse>
+                          <ArticleProse>{sec.konten}</ArticleProse>
                         </section>
                       );
                     })}
@@ -347,7 +409,7 @@ export function DiseaseDetailPage() {
             <MedicalDisclaimer />
           </div>
         </article>
-        <aside className="order-first lg:order-none lg:sticky lg:top-20 space-y-8">
+        <aside className="hidden lg:block lg:sticky lg:top-20 space-y-8 lg:max-h-[calc(100vh-6rem)] overflow-y-auto pr-2">
           <TableOfContents items={tocItems} />
           <BodyPartPreview ids={data.bagian_tubuh.map((part) => part.id)} />
         </aside>

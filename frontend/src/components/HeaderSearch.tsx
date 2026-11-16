@@ -34,22 +34,22 @@ export function HeaderSearch({ autoFocus }: { autoFocus?: boolean }) {
           aria-label="Cari penyakit atau gejala"
           autoComplete="off"
           autoFocus={autoFocus}
-          className="w-full pl-9 pr-8 py-2 text-base sm:text-sm border border-input bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+          className="h-9 w-full rounded-lg border border-border bg-card/70 pl-9 pr-10 text-base text-ink transition-colors placeholder:text-muted-foreground focus:border-transparent focus:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
         />
         {query && (
           <button
             type="button"
             onClick={handleClear}
             aria-label="Hapus pencarian"
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-accent transition-colors"
+            className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <X className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
       </div>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-2 z-30 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
+        <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-border bg-popover shadow-xl shadow-pine/5">
           {isLoading ? (
             <div className="p-3 space-y-2">
               {[...Array(4)].map((_, i) => (

@@ -8,6 +8,7 @@ import type {
   ChatTurn,
   Disease,
   DiseaseDetail,
+  DiseaseListItem,
   LoginPayload,
   Model,
   Patogen,
@@ -178,6 +179,10 @@ export const api = {
     getSistemTubuh: () => get<{ sistem_tubuh: SystemRecord[] }>("/api/sistem-tubuh"),
     getSystemsByBodyPart: (idBody: number) =>
       get<{ sistem_tubuh: SystemRecord[] }>(`/api/sistem-tubuh/byBody/${idBody}`),
+    getPenyakitTerbaru: (limit = 6) =>
+      get<{ penyakit: DiseaseListItem[] }>(
+        `/api/penyakit/terbaru?limit=${limit}`,
+      ),
     getAnalysesByBodyPart: (idBody: number) =>
       get<{ jenis_analisis: AnalysisTypeRecord[] }>(`/api/jenis-analisis/byBody/${idBody}`),
     getDiseasesBySystemAndBody: (idBody: number, idSystem: number) =>

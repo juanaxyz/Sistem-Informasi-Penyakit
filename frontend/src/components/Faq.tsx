@@ -7,12 +7,12 @@ import {
 } from "../react-bits/components/ui/accordion";
 
 const FAQ_DATA = {
-  "website apa ini ?":
-    "Sistem Informasi Penyakit Tubuh adalah website yang membantu pengguna mencari informasi penyakit dengan cara yang mudah dan visual. Pengguna dapat menjelajahi informasi kesehatan melalui tiga cara: mengklik bagian tubuh pada peta tubuh interaktif (body map), memilih kategori sistem tubuh (seperti sistem pencernaan atau pernapasan), atau menggunakan pencarian teks langsung. Website ini bersifat informasional dan edukatif, bukan alat diagnosis medis.",
-  "Cara menggunakan body map (peta tubuh)":
-    "Body map adalah ilustrasi tubuh manusia yang bisa diklik. Caranya: pilih tampilan depan atau belakang tubuh, pilih tampilan pria atau wanita menggunakan tombol toggle, lalu klik bagian tubuh yang ingin diketahui (misalnya kepala, dada, atau perut). Setelah diklik, akan muncul daftar penyakit yang berkaitan dengan area tubuh tersebut. Klik salah satu penyakit di daftar itu untuk melihat informasi lengkapnya.",
-  "Apakah website ini bisa mendiagnosis penyakit saya":
-    "Tidak. Website ini bukan alat diagnosis dan tidak dapat menentukan penyakit yang dialami pengguna secara personal. Sistem ini murni hanya menyediakan informasi edukatif tentang berbagai penyakit berdasarkan bagian tubuh atau kategori yang dipilih pengguna, bukan menganalisis gejala spesifik pengguna untuk memberikan kesimpulan diagnosis. serta memberikan klasifikasi x-ray khusus untuk paru paru menggunakan algoritma deep learnning untuk mengetahui apakah paru paru normal atau tidak (dengan ada 7 kelas klasifikasi yaitu pneumonia, covid 19, tuberculosis, pneumonia, mass, nodule, lung opacity). Untuk mengetahui kondisi kesehatan yang sebenarnya, pengguna harus berkonsultasi langsung dengan dokter atau tenaga medis profesional.",
+  "Website apa ini?":
+    "Sistem Informasi Penyakit Tubuh adalah website yang membantu pengguna mencari informasi penyakit dengan cara yang mudah dan visual. Pengguna dapat menjelajahi informasi kesehatan melalui beberapa cara: mengklik bagian tubuh pada peta tubuh interaktif, memilih kategori sistem tubuh (seperti sistem pencernaan, pernapasan, atau saraf), menggunakan pencarian teks, serta mencoba analisis gambar berbantuan AI untuk pemeriksaan tertentu. Website ini bersifat informasional dan edukatif, bukan alat diagnosis medis.",
+  "Bagaimana cara menggunakan peta tubuh?":
+    "Peta tubuh adalah ilustrasi tubuh manusia yang bisa diklik. Caranya: pilih tampilan depan atau belakang, lalu klik bagian tubuh yang ingin diketahui (misalnya kepala, dada, atau perut). Setelah diklik, akan muncul daftar sistem dan penyakit yang berkaitan dengan area tubuh tersebut. Klik salah satu penyakit untuk melihat informasi lengkapnya.",
+  "Apakah website ini bisa mendiagnosis penyakit saya?":
+    "Tidak. Website ini bukan alat diagnosis dan tidak dapat menentukan penyakit yang dialami pengguna secara personal. Sistem ini menyediakan informasi edukatif tentang berbagai penyakit berdasarkan bagian tubuh atau sistem yang dipilih. Fitur analisis gambar berbantuan AI memberikan klasifikasi beserta tingkat keyakinan untuk jenis pemeriksaan yang tersedia, dan hasilnya tetap bukan diagnosis. Ketersediaan jenis analisis dapat berbeda untuk setiap bagian tubuh dan akan terus bertambah. Untuk mengetahui kondisi kesehatan yang sebenarnya, konsultasikan langsung dengan dokter atau tenaga medis profesional.",
 };
 
 const FAQ_ENTRIES = Object.entries(FAQ_DATA);

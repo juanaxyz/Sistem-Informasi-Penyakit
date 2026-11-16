@@ -1,24 +1,29 @@
 import { Search, BookOpen, ScanLine } from "lucide-react";
+import { motion } from "motion/react";
 
 const FEATURES = [
   {
     icon: <Search className="h-6 w-6" />,
     title: "Jelajahi",
     description: "Pilih bagian tubuh pada peta interaktif",
+    delay: 0.2,
   },
   {
     icon: <BookOpen className="h-6 w-6" />,
     title: "Temukan",
     description: "Pelajari penyakit dan kondisi terkait",
+    delay: 0.8,
   },
   {
     icon: <ScanLine className="h-6 w-6" />,
     title: "Analisis",
-    description: "Unggah gambar untuk analisis AI",
+    description: "Unggah gambar medis untuk dianalisis AI",
+    delay: 1.4,
   },
 ];
 
 export default function HowItWorks() {
+
   return (
     <section
       aria-labelledby="how-it-works-heading"
@@ -29,7 +34,10 @@ export default function HowItWorks() {
       </h2>
       <div className="mt-8 grid gap-4 md:grid-cols-3 md:gap-6">
         {FEATURES.map((feature) => (
-          <div
+          <motion.div
+            initial={{opacity:0}}
+            whileInView={{opacity:1}}
+            transition={{delay: feature.delay}}
             key={feature.title}
             className="group relative rounded-xl border border-border bg-card p-6 text-center transition-colors hover:border-pine/40 hover:bg-muted/30"
           >
@@ -42,7 +50,7 @@ export default function HowItWorks() {
             <p className="mt-2 text-body-sm font-body text-muted-foreground leading-relaxed text-pretty">
               {feature.description}
             </p>
-          </div>
+          </motion.div>
         ))}
       </div>
     </section>

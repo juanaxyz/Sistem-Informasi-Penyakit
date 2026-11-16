@@ -1,15 +1,20 @@
 import { useBodyParts } from "@/hooks/useBodyParts";
+import { useSistemTubuh } from "@/hooks/useSistemTubuh";
 
 export default function Statistics() {
   const { data: bodyParts } = useBodyParts();
+  const { data: systems } = useSistemTubuh();
 
   const stats = [
     {
       value: bodyParts != null ? String(bodyParts.length) : "–",
       label: "Bagian tubuh",
     },
+    {
+      value: systems != null ? String(systems.length) : "–",
+      label: "Sistem tubuh",
+    },
     { value: "3", label: "Tingkat urgensi" },
-    { value: "2", label: "Tampilan peta" },
     { value: "3", label: "Sumber acuan" },
   ];
 

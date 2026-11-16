@@ -35,6 +35,11 @@ export interface Disease {
   tingkat_urgensi: UrgencyLevel;
 }
 
+/** Penyakit pada etalase beranda, lengkap dengan nama sistem tubuhnya. */
+export interface DiseaseListItem extends Disease {
+  sistem_tubuh_nama?: string | null;
+}
+
 export interface Referensi {
   id: number;
   url: string | null;

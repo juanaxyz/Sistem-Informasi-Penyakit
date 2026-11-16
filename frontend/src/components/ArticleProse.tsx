@@ -71,11 +71,29 @@ export function ArticleProse({
   );
 }
 
-export function TableOfContents({ items }: { items: TocItem[] }) {
+function scrollToSection(id: string) {
+  const element = document.getElementById(id);
+  if (!element) return;
+
+  const header = document.querySelector("header");
+  const headerHeight = header ? header.getBoundingClientRect().height : 0;
+  const offset = headerHeight + 24;
+
+  const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+  window.scrollTo({ top: elementPosition - offset, behavior: "smooth" });
+}
+
+export function TableOfContents({
+  items,
+  onNavigate,
+}: {
+  items: TocItem[];
+  onNavigate?: () => void;
+}) {
   if (items.length === 0) return null;
 
   return (
-    <nav className="toc sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto space-y-1.5 pr-2" aria-label="Daftar isi">
+    <nav className="toc space-y-1.5" aria-label="Daftar isi">
       <h4 className="text-ui font-body font-semibold text-muted-foreground uppercase tracking-wider mb-3">
         Daftar Isi
       </h4>
@@ -84,6 +102,12 @@ export function TableOfContents({ items }: { items: TocItem[] }) {
           <li key={item.id} style={{ paddingLeft: item.level === 3 ? "1rem" : 0 }}>
             <a
               href={`#${item.id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                scrollToSection(item.id);
+                history.pushState(null, "", `#${item.id}`);
+                onNavigate?.();
+              }}
               className="toc-link block text-body-sm font-body text-muted-foreground hover:text-pine transition-colors py-0.5 truncate"
             >
               {item.text}

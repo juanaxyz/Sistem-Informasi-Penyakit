@@ -181,12 +181,12 @@ export default function Hero() {
         className="text-center lg:col-span-6 lg:text-left"
       >
         <h1 className="text-display font-display text-ink leading-tight tracking-tight text-balance">
-          Pahami Tubuh Anda. Jelajahi Penyakit.
+          Pahami Tubuh Anda. Jelajahi Penyakitnya.
         </h1>
 
         <p className="mx-auto mt-6 max-w-xl text-body font-body leading-relaxed text-muted-foreground text-pretty lg:mx-0">
-          Jelajahi penyakit lewat peta tubuh interaktif dan analisis gambar
-          rontgen dada dengan teknologi AI.
+          Jelajahi penyakit lewat peta tubuh interaktif, informasi per sistem
+          tubuh, dan analisis gambar medis berbasis AI.
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
@@ -208,7 +208,7 @@ export default function Hero() {
         </div>
 
         <p className="mt-6 text-body-sm font-body text-muted-foreground">
-          Tanpa login · Gratis · Untuk edukasi
+          Informasi gratis · Untuk edukasi
         </p>
       </motion.div>
 
