@@ -35,10 +35,10 @@
   /* Product-specific palette aliases for direct use */
   --color-pine: var(--primary);
   --color-pine-foreground: var(--primary-foreground);
-  --color-mint: oklch(0.93 0.03 160);
-  --color-mint-foreground: oklch(0.25 0.02 160);
-  --color-paper: oklch(0.97 0.01 150);
-  --color-ink: oklch(0.15 0.01 160);
+  --color-mint: var(--secondary);
+  --color-mint-foreground: var(--secondary-foreground);
+  --color-paper: var(--background);
+  --color-ink: var(--foreground);
 
   /* Font tokens */
   --font-display: "Merriweather", ui-serif, Georgia, serif;
@@ -92,6 +92,29 @@
   --border: oklch(0.88 0.03 160);           /* #D6E1DC */
   --input: oklch(0.88 0.03 160);
   --ring: oklch(0.32 0.08 165);             /* pine */
+}
+
+.dark {
+  /* Dark theme — midnight clinical slate with luminous pine */
+  --background: oklch(0.18 0.015 160);
+  --foreground: oklch(0.95 0.01 150);
+  --card: oklch(0.22 0.015 160);
+  --card-foreground: oklch(0.95 0.01 150);
+  --popover: oklch(0.22 0.015 160);
+  --popover-foreground: oklch(0.95 0.01 150);
+  --primary: oklch(0.65 0.12 165);
+  --primary-foreground: oklch(0.15 0.01 160);
+  --secondary: oklch(0.26 0.02 160);
+  --secondary-foreground: oklch(0.90 0.01 150);
+  --muted: oklch(0.24 0.015 160);
+  --muted-foreground: oklch(0.68 0.02 160);
+  --accent: oklch(0.26 0.02 160);
+  --accent-foreground: oklch(0.90 0.01 150);
+  --destructive: oklch(0.62 0.22 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.28 0.015 160);
+  --input: oklch(0.28 0.015 160);
+  --ring: oklch(0.65 0.12 165);
 }
 
 @layer base {

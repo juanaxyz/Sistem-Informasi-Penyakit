@@ -62,7 +62,7 @@ function AnalysisSelectionModal({
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
-          className="my-auto flex max-h-[calc(100dvh-3rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-border bg-white shadow-2xl"
+          className="my-auto flex max-h-[calc(100dvh-3rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-2xl"
         >
           <div className="flex shrink-0 items-start justify-between border-b border-border px-6 py-5">
             <div>
@@ -326,7 +326,7 @@ function AnalyzePage({
                       type="button"
                       onClick={resetPreview}
                       aria-label="Hapus gambar"
-                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white/90 text-muted-foreground shadow-sm transition-colors hover:text-red-600 hover:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card/90 text-muted-foreground shadow-sm transition-colors hover:text-red-600 hover:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

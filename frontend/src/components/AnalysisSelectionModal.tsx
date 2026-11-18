@@ -77,7 +77,7 @@ export default function AnalysisSelectionModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="analysis-modal-title"
-            className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl border border-border bg-white shadow-2xl"
+            className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl border border-border bg-card shadow-2xl"
           >
             {/* Header */}
             <div className="flex items-start justify-between border-b border-border px-6 py-5">
