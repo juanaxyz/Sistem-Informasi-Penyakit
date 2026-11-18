@@ -32,6 +32,20 @@ def split_sentences(text: str) -> list[str]:
     return [part.strip() for part in _SENTENCE_END.split(text) if part and part.strip()]
 
 
+def n_tokens(tokenizer, text: str) -> int:
+    """Hitung token tanpa token khusus — dipakai pembagian chunk per bagian."""
+    return len(tokenizer(text, add_special_tokens=False)["input_ids"])
+
+
+def header_cost(tokenizer, header: str) -> int:
+    """Biaya token header + token khusus <s>/</s> yang ditambahkan model."""
+    header = (header or "").strip()
+    if not header:
+        return 2
+    return len(tokenizer(header + "\n", add_special_tokens=False)["input_ids"]) + 2
+
+
+
 def _token_boundaries(text: str, tokenizer) -> tuple[list[int], list[tuple[int, int]]]:
     """Token id + offset karakter, tanpa token khusus."""
     enc = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True)
@@ -82,9 +96,7 @@ def chunk_text(
         )
 
     header = (header or "").strip()
-    # +2 untuk token khusus <s> dan </s> yang ditambahkan model.
-    header_cost = len(tokenizer(header + "\n", add_special_tokens=False)["input_ids"]) + 2 if header else 2
-    body_budget = max_tokens - header_cost
+    body_budget = max_tokens - header_cost(tokenizer, header)
     if body_budget < _MIN_BODY_BUDGET:
         raise ValueError(
             f"Header konteks memakai {header_cost} token sehingga hanya menyisakan "
@@ -137,4 +149,68 @@ def chunk_text(
                 next_start = earlier[-1]
         start = next_start
 
+    return chunks
+
+
+def chunk_section(
+    text: str,
+    tokenizer,
+    *,
+    max_tokens: int = CHUNK_TOKENS,
+    overlap_tokens: int = CHUNK_OVERLAP_TOKENS,
+    header: str = "",
+) -> list[str]:
+    """Pecah SATU bagian artikel (sudah teks polos) menjadi chunk.
+
+    Aturan kontrak artikel: bagian utuh bila muat; jika terlalu panjang, pecah
+    per paragraf lalu isi chunk secara girang sampai batas `max_tokens`
+    (termasuk header konteks). Paragraf yang sendirian melebihi batas dipecah
+    lagi oleh `chunk_text` (snap ke batas kalimat).
+    """
+    text = (text or "").strip()
+    if not text:
+        return []
+
+    budget = max_tokens - header_cost(tokenizer, header)
+    if budget < _MIN_BODY_BUDGET:
+        raise ValueError(
+            f"Header konteks memakai {max_tokens - budget} token sehingga hanya menyisakan "
+            f"{budget} token untuk isi. Header terlalu panjang atau "
+            f"CHUNK_TOKENS terlalu kecil."
+        )
+
+    if n_tokens(tokenizer, text) <= budget:
+        return chunk_text(
+            text, tokenizer, max_tokens=max_tokens,
+            overlap_tokens=overlap_tokens, header=header,
+        )
+
+    chunks: list[str] = []
+    buf = ""
+    buf_tokens = 0
+    for paragraph in split_paragraphs(text):
+        para_tokens = n_tokens(tokenizer, paragraph)
+        if para_tokens > budget:
+            if buf:
+                chunks.extend(chunk_text(buf, tokenizer, max_tokens=max_tokens,
+                                         overlap_tokens=overlap_tokens, header=header))
+                buf = ""
+                buf_tokens = 0
+            chunks.extend(chunk_text(paragraph, tokenizer, max_tokens=max_tokens,
+                                     overlap_tokens=overlap_tokens, header=header))
+            continue
+
+        separator_tokens = 1 if buf else 0
+        if buf and buf_tokens + separator_tokens + para_tokens > budget:
+            chunks.extend(chunk_text(buf, tokenizer, max_tokens=max_tokens,
+                                     overlap_tokens=overlap_tokens, header=header))
+            buf = paragraph
+            buf_tokens = para_tokens
+        else:
+            buf = f"{buf}\n{paragraph}" if buf else paragraph
+            buf_tokens += separator_tokens + para_tokens
+
+    if buf:
+        chunks.extend(chunk_text(buf, tokenizer, max_tokens=max_tokens,
+                                 overlap_tokens=overlap_tokens, header=header))
     return chunks

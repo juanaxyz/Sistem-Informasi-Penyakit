@@ -1,7 +1,7 @@
 -- Skema tabel vector untuk RAG (semantic search) di PostgreSQL.
 -- Aman dijalankan ulang (idempotent) lewat `python scripts/apply_schema.py`.
 --
--- Tabel sumber (penyakit, artikel, artikel_bagian, faq) diasumsikan sudah ada
+-- Tabel sumber (penyakit, artikel, faq) diasumsikan sudah ada
 -- di database yang sama -- cek `server/db/schema.sql` untuk tabel inti aplikasi.
 --
 -- CATATAN DIMENSI: kolom `embedding` bertipe VECTOR(384) karena model embedding
@@ -13,10 +13,11 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Satu baris = satu chunk dari satu sumber.
---   source_type = 'disease' -> source_id = artikel_bagian.id, penyakit_id = penyakit.id
---   source_type = 'faq'     -> source_id = faq.id,             penyakit_id = NULL
+--   source_type = 'disease' -> source_id = artikel.id, penyakit_id = penyakit.id
+--   source_type = 'faq'     -> source_id = faq.id,         penyakit_id = NULL
 --
--- Chunking: satu sumber (mis. satu artikel_bagian) dipecah jadi beberapa chunk
+-- Chunking: satu artikel dipecah jadi beberapa chunk per heading <h2>
+-- (bagian yang lebih panjang dari CHUNK_TOKENS dipecah lagi per paragraf)
 -- supaya tiap vektor berisi satu gagasan utuh dan muat dalam batas input model.
 -- Karena itu `chunk_index` wajib ada: (source_type, source_id) saja tidak unik lagi.
 CREATE TABLE IF NOT EXISTS knowledge_embeddings (

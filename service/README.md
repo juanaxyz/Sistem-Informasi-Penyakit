@@ -145,14 +145,14 @@ service/
 python ingest.py
 ```
 
-- `source_type='disease'`: 1 baris per baris `artikel_bagian` yang kontennya
+- `source_type='disease'`: 1 baris per `artikel` yang `konten` (HTML Quill)
   tidak kosong,_join_ ke `penyakit` untuk nama penyakit. `source_id` =
-  `artikel_bagian.id`, `penyakit_id` = `penyakit.id` (dipakai untuk link
-  `/penyakit/{id}`).
+  `artikel.id`, `penyakit_id` = `penyakit.id` (dipakai untuk link
+  `/penyakit/{id}`). Satu artikel dipecah per heading `<h2>`.
 - `source_type='faq'`: 1 baris per baris `faq` dengan pertanyaan & jawaban
   terisi. `source_id` = `faq.id`, `penyakit_id` = NULL.
 - **Inkremental**: baris dengan `content_hash` yang tidak berubah tidak
-  di-embed ulang (menghemat panggilan Gemini). Baris yang hilang dari sumber
+  di-embed ulang (menghemat waktu embedding lokal). Baris yang hilang dari sumber
   otomatis dihapus.
 - Jalankan ulang setiap kali konten penyakit atau FAQ berubah.
 
@@ -226,7 +226,7 @@ Response contoh (mode stub):
   Keduanya default ke `http://localhost:8000` (satu service ini).
 - **Database**: service ini dan BFF membaca satu PostgreSQL yang sama
   (`PGHOST`/`PGUSER`/`PGPASSWORD`/`PGDATABASE` identik dengan `server/.env`).
-  Tabel sumber (`penyakit`, `artikel_bagian`, `faq`) dipakai bersama; tabel
+  Tabel sumber (`penyakit`, `artikel`, `faq`) dipakai bersama; tabel
   vector `knowledge_embeddings` dimiliki service ini saja.
 - **Frontend**: `frontend/src/lib/api.ts` (`api.chat`, `api.riwayat.create`);
   `ChatWidget.tsx` untuk chat, `AnalysisPage.tsx` untuk upload gambar.
@@ -239,7 +239,7 @@ Response contoh (mode stub):
 | `relation "knowledge_embeddings" does not exist` | Skema belum diterapkan → `python scripts/apply_schema.py`. |
 | `operator does not exist: vector <=> unknown` | Ekstensi pgvector belum aktif → `CREATE EXTENSION vector;` (atau jalankan ulang `apply_schema.py`). |
 | Semua pertanyaan dijawab "di luar cakupan" | `knowledge_embeddings` masih kosong → `python ingest.py`. |
-| Jawaban tanpa link `/penyakit/{id}` | `penyakit_id` NULL — pastikan sumber disease diambil dari `artikel_bagian` yang ter-`JOIN` ke `penyakit`, lalu `ingest.py`. |
+| Jawaban tanpa link `/penyakit/{id}` | `penyakit_id` NULL — pastikan sumber disease diambil dari `artikel` yang ter-`JOIN` ke `penyakit`, lalu `ingest.py`. |
 | Port 8000 sudah dipakai | Ada instance service lama yang masih jalan. Matikan dulu, lalu jalankan ulang agar env/kode baru terpasang. |
 
 ## Kalibrasi

@@ -1,20 +1,19 @@
 ﻿"""Sinkronisasi `knowledge_embeddings` dari sumber di database.
 
-Dipakai dua kali:
-- `ingest.py` (CLI, untuk seeding manual)
+Dipakai tiga jalur:
+- `ingest.py` (CLI, backfill penuh)
 - `POST /api/load-knowledge` (endpoint, dipicu tombol admin panel)
+- `POST /api/ingest-article` (dipicu BFF setiap kali artikel disimpan)
 
-Alur: baca sumber -> hash -> chunk -> embed (lokal) -> upsert.
+Sumber konten disease: tabel `artikel` (satu HTML Quill per penyakit, sudah
+disanitasi BFF). Satu artikel dipecah menjadi chunk per heading <h2>
+(isi <h3> ikut bagian <h2>-nya); bagian yang lebih panjang dari
+`CHUNK_TOKENS` dipecah lagi per paragraf. `content` selalu teks polos
+(diprefix header konteks "Nama: ... Bagian: ..."), BUKAN HTML.
 
-Keputusan desain: TIDAK ada logika "skip kalau hash sama". Embedding berjalan
-lokal di CPU (~20 ms/chunk), jadi tidak ada biaya API, kuota, atau rate limit
-yang perlu dihindari. Menghemat hitungan itu hanya menambah bureaucracy
-(hash parsing, chunk_index bookkeeping, penghapusan ekor) dengan risiko data
-basi. Hash tetap DIHITUNG dan disimpan, tapi hanya untuk dilaporkan ke admin
-("berapa sumber yang berubah") --ã™ Ø§Ø®ØªØ¨Ø§Ø± idempotensi.
-
-Catatan: satu sumber (artikel_bagian / faq) dipecah menjadi beberapa chunk
-supaya tiap vektor berisi satu gagasan utuh dan muat dalam batas input model.
+Optimasi: chunk yang `content_hash`-nya tidak berubah (dan embed_model sama)
+tidak di-embed ulang. Chunk lama dengan indeks yang tak lagi ada dihapus,
+sehingga artikel yang makin pendek tidak meninggalkan vektor basi.
 """
 
 import hashlib
@@ -25,28 +24,33 @@ from psycopg.rows import dict_row
 
 from app.config import CHUNK_TOKENS, EMBEDDING_MODEL, PG_DSN
 from app.db import to_vector_literal
-from app.services.chunking import chunk_text
+from app.services.chunking import chunk_section, chunk_text
 from app.services.embedding import generate_embeddings, get_tokenizer
+from app.services.html_split import html_to_plain_text, split_sections, split_paragraphs
 
 SOURCE_DISEASE = "disease"
 SOURCE_FAQ = "faq"
 
-# Konten penyakit diambil dari `artikel_bagian` (kolom `artikel.konten` adalah
-# legacy yang kosong). Rantai relasi: artikel_bagian -> artikel -> penyakit.
+# Konten penyakit berasal dari `artikel` (satu HTML Quill per penyakit).
 # Join bagian_tubuh via penyakit_bagian_tubuh untuk metadata body parts.
 DISEASE_SQL = """
-    SELECT ab.id AS source_id, a.id_penyakit AS penyakit_id,
-           ab.judul, ab.konten, p.nama AS nama_penyakit,
+    SELECT a.id AS source_id, a.id_penyakit AS penyakit_id,
+           a.konten, COALESCE(NULLIF(a.konten_teks, ''), NULL) AS konten_teks,
+           p.nama AS nama_penyakit,
            COALESCE(array_agg(DISTINCT bt.nama) FILTER (WHERE bt.nama IS NOT NULL), '{}') AS bagian_tubuh
-    FROM artikel_bagian ab
-    JOIN artikel a ON a.id = ab.id_artikel
+    FROM artikel a
     JOIN penyakit p ON p.id = a.id_penyakit
     LEFT JOIN penyakit_bagian_tubuh pbt ON pbt.id_penyakit = p.id
     LEFT JOIN bagian_tubuh bt ON bt.id = pbt.id_bagian_tubuh
-    WHERE COALESCE(btrim(ab.konten), '') <> ''
-    GROUP BY ab.id, a.id_penyakit, ab.judul, ab.konten, p.nama
-    ORDER BY a.id_penyakit, ab.urutan, ab.id
+    WHERE COALESCE(btrim(a.konten), '') <> ''
+    GROUP BY a.id, a.id_penyakit, a.konten, a.konten_teks, p.nama
+    ORDER BY a.id_penyakit, a.id
 """
+
+DISEASE_SQL_ONE = DISEASE_SQL.replace(
+    "WHERE COALESCE(btrim(a.konten), '') <> ''",
+    "WHERE a.id = %(id_artikel)s AND COALESCE(btrim(a.konten), '') <> ''",
+)
 
 FAQ_SQL = """
     SELECT id AS source_id, pertanyaan, jawaban
@@ -65,9 +69,9 @@ def content_sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _disease_header(row: dict) -> str:
-    header = f"Nama: {row['nama_penyakit']}"
-    judul = (row.get("judul") or "").strip()
+def _disease_header(nama_penyakit: str, judul: str | None) -> str:
+    header = f"Nama: {nama_penyakit}"
+    judul = (judul or "").strip()
     if judul:
         header += f"\nBagian: {judul}"
     return header
@@ -77,18 +81,26 @@ def _faq_header(row: dict) -> str:
     return f"Pertanyaan: {(row['pertanyaan'] or '').strip()}"
 
 
-def _plan_rows(conn: psycopg.Connection, tokenizer) -> list[dict]:
-    """Baca sumber, pecah jadi chunk, dan hashi semuanya.
+def _plan_disease_chunks(row: dict, tokenizer) -> list[str]:
+    """Pecah satu artikel menjadi chunk teks polos per heading <h2>."""
+    html = row["konten"] or ""
+    pieces: list[str] = []
+    for judul, text in split_sections(html):
+        header = _disease_header(row["nama_penyakit"], judul)
+        pieces.extend(
+            chunk_section(text, tokenizer, max_tokens=CHUNK_TOKENS, header=header)
+        )
+    return pieces
 
-    Mengembalikan daftar chunk yangåˆ°æ—¶å€™ akan ditulis, lengkap dengan
-    `source_hash` (per sumber) dan `content_hash` (per chunk).
-    """
+
+def _plan_rows(conn: psycopg.Connection, tokenizer) -> list[dict]:
+    """Baca sumber, pecah jadi chunk, dan hashi semuanya."""
     planned: list[dict] = []
 
     for row in conn.execute(DISEASE_SQL).fetchall():
-        raw = (row["konten"] or "").strip()
-        source_hash = content_sha256(f"{row['nama_penyakit']}\n{row['judul'] or ''}\n{raw}")
-        pieces = chunk_text(raw, tokenizer, header=_disease_header(row))
+        raw = (row["konten_teks"] or "").strip() or html_to_plain_text(row["konten"])
+        source_hash = content_sha256(f"{row['nama_penyakit']}\n{raw}")
+        pieces = _plan_disease_chunks(row, tokenizer)
         bagian_tubuh = row["bagian_tubuh"] if row["bagian_tubuh"] else []
         for i, piece in enumerate(pieces):
             planned.append(
@@ -109,7 +121,8 @@ def _plan_rows(conn: psycopg.Connection, tokenizer) -> list[dict]:
         answer = (row["jawaban"] or "").strip()
         raw = f"Pertanyaan: {question}\nJawaban: {answer}"
         source_hash = content_sha256(raw)
-        pieces = chunk_text(answer, tokenizer, header=_faq_header(row))
+        header = _faq_header(row)
+        pieces = chunk_text(answer, tokenizer, header=header)
         for i, piece in enumerate(pieces):
             planned.append(
                 {
@@ -127,24 +140,29 @@ def _plan_rows(conn: psycopg.Connection, tokenizer) -> list[dict]:
     return planned
 
 
-def _stored_state(conn: psycopg.Connection) -> dict[tuple[str, int], dict]:
-    """Status tersimpan per sumber: source_hash, embed_model, jumlah chunk."""
+def _stored_chunks(conn: psycopg.Connection) -> dict[tuple[str, int], dict[int, tuple[str, str]]]:
+    """{source_key: {chunk_index: (content_hash, embed_model)}}."""
     rows = conn.execute(
         """
-        SELECT source_type, source_id, source_hash, embed_model,
-               count(*)::int AS n_chunk
+        SELECT source_type, source_id, chunk_index, content_hash, embed_model
         FROM knowledge_embeddings
-        GROUP BY source_type, source_id, source_hash, embed_model
         """
     ).fetchall()
-    return {(r["source_type"], r["source_id"]): r for r in rows}
+    stored: dict[tuple[str, int], dict[int, tuple[str, str]]] = {}
+    for r in rows:
+        key = (r["source_type"], r["source_id"])
+        stored.setdefault(key, {})[r["chunk_index"]] = (
+            r["content_hash"], r["embed_model"],
+        )
+    return stored
+
+
+def _is_current(chunk_info: tuple[str, str], content_hash: str) -> bool:
+    return chunk_info[0] == content_hash and chunk_info[1] == EMBEDDING_MODEL
 
 
 def run_ingest(log=print) -> dict:
-    """Sinkronkan seluruh basis pengetahuan. Mengembalikan ringkasan.
-
-    `log` menerima callable untuk pelaporan progres (CLI prints, API diam).
-    """
+    """Sinkronkan seluruh basis pengetahuan. Mengembalikan ringkasan."""
     started = time.perf_counter()
     tokenizer = get_tokenizer()
 
@@ -152,115 +170,163 @@ def run_ingest(log=print) -> dict:
         planned = _plan_rows(conn, tokenizer)
         if not planned:
             raise IngestError(
-                "Tidak ada konten sumber. Isi tabel artikel_bagian atau faq terlebih dahulu."
+                "Tidak ada konten sumber. Isi tabel artikel atau faq terlebih dahulu."
             )
 
-        stored = _stored_state(conn)
-
-        # Laporan: sumber mana yang berubah (informasi saja, bukan gerbang skip).
-        by_source: dict[tuple[str, int], set[str]] = {}
-        for p in planned:
-            by_source.setdefault((p["source_type"], p["source_id"]), set()).add(p["source_hash"])
-        changed = [
-            key
-            for key, hashes in by_source.items()
-            if key not in stored
-            or stored[key]["source_hash"] not in hashes
-            or stored[key]["embed_model"] != EMBEDDING_MODEL
-        ]
-        unchanged = len(by_source) - len(changed)
-
-        # Chunk yang tidak ada di DB anymore -> hapus.
-        wanted_counts: dict[tuple[str, int], int] = {}
-        for p in planned:
-            key = (p["source_type"], p["source_id"])
-            wanted_counts[key] = max(wanted_counts.get(key, 0), p["chunk_index"] + 1)
-
-        stale_sources = [k for k in stored if k not in wanted_counts]
-        shrunk = [
-            k for k, n in wanted_counts.items()
-            if k in stored and stored[k]["n_chunk"] > n
-        ]
-
-        n_sources = {SOURCE_DISEASE: 0, SOURCE_FAQ: 0}
-        for st, _sid in wanted_counts:
-            n_sources[st] = n_sources.get(st, 0) + 1
-
-        log(f"Sumber: disease={n_sources[SOURCE_DISEASE]}, faq={n_sources[SOURCE_FAQ]}")
+        summary = _sync_sources(conn, tokenizer, planned, log)
+        summary["chunk_tokens"] = CHUNK_TOKENS
+        summary["durasi_detik"] = round(time.perf_counter() - started, 2)
         log(
-            f"Chunk: total={len(planned)} | sumber berubah={len(changed)}, "
-            f"tidak berubah={unchanged}, dihapus={len(stale_sources)}"
+            f"Selesai: {summary['total']} chunk dari {sum(summary['sumber'].values())} sumber "
+            f"dalam {summary['durasi_detik']}s"
         )
+        return summary
 
-        vectors = generate_embeddings([p["content"] for p in planned])
 
-        with conn.transaction():
-            for key in stale_sources:
+def ingest_article(id_artikel: int, log=print) -> dict:
+    """Sinkronkan chunk satu artikel (dipicu BFF setelah PUT /api/artikel/:id)."""
+    started = time.perf_counter()
+    tokenizer = get_tokenizer()
+
+    with psycopg.connect(PG_DSN, row_factory=dict_row) as conn:
+        rows = conn.execute(DISEASE_SQL_ONE, {"id_artikel": id_artikel}).fetchall()
+        if not rows:
+            raise IngestError(f"artikel {id_artikel} tidak ditemukan / kontennya kosong")
+
+        planned: list[dict] = []
+        for row in rows:
+            raw = (row["konten_teks"] or "").strip() or html_to_plain_text(row["konten"])
+            source_hash = content_sha256(f"{row['nama_penyakit']}\n{raw}")
+            pieces = _plan_disease_chunks(row, tokenizer)
+            for i, piece in enumerate(pieces):
+                planned.append(
+                    {
+                        "source_type": SOURCE_DISEASE,
+                        "source_id": row["source_id"],
+                        "chunk_index": i,
+                        "penyakit_id": row["penyakit_id"],
+                        "bagian_tubuh": row["bagian_tubuh"] or [],
+                        "content": piece,
+                        "source_hash": source_hash,
+                        "content_hash": content_sha256(piece),
+                    }
+                )
+
+        summary = _sync_sources(conn, tokenizer, planned, log)
+        summary["id_artikel"] = id_artikel
+        summary["chunk_tokens"] = CHUNK_TOKENS
+        summary["durasi_detik"] = round(time.perf_counter() - started, 2)
+        return summary
+
+
+def _sync_sources(conn, tokenizer, planned: list[dict], log) -> dict:
+    """Tulis rencana chunk ke DB: embed hanya yang berubah, hapus yang basi."""
+    stored = _stored_chunks(conn)
+
+    by_source: dict[tuple[str, int], list[dict]] = {}
+    for p in planned:
+        by_source.setdefault((p["source_type"], p["source_id"]), []).append(p)
+
+    to_embed: list[dict] = []
+    unchanged_meta: list[dict] = []
+    changed_sources = 0
+
+    for key, pieces in by_source.items():
+        source_chunks = stored.get(key, {})
+        source_changed = False
+        for p in pieces:
+            stored_info = source_chunks.get(p["chunk_index"])
+            if stored_info is None or not _is_current(stored_info, p["content_hash"]):
+                to_embed.append(p)
+                source_changed = True
+            else:
+                unchanged_meta.append(p)
+        if source_changed:
+            changed_sources += 1
+
+    log(f"Chunk: total={len(planned)} | perlu embed={len(to_embed)}, "
+        f"tidak berubah={len(unchanged_meta)}")
+
+    vectors = generate_embeddings([p["content"] for p in to_embed]) if to_embed else []
+
+    with conn.transaction():
+        # Sumber yang hilang dari DB -> hapus seluruh chunk-nya.
+        for key in stored:
+            if key not in by_source:
                 conn.execute(
                     "DELETE FROM knowledge_embeddings WHERE source_type = %s AND source_id = %s",
                     key,
                 )
-            for key in shrunk:
+        # Artikel makin pendek -> hapus ekor chunk_index yang tak lagi ada.
+        for key, pieces in by_source.items():
+            wanted = max(p["chunk_index"] for p in pieces) + 1
+            if key in stored and len(stored[key]) > wanted:
                 conn.execute(
                     "DELETE FROM knowledge_embeddings "
                     "WHERE source_type = %s AND source_id = %s AND chunk_index >= %s",
-                    (key[0], key[1], wanted_counts[key]),
+                    (key[0], key[1], wanted),
                 )
 
-            for row, vector in zip(planned, vectors):
-                conn.execute(
-                    """
-                    INSERT INTO knowledge_embeddings
-                        (source_type, source_id, chunk_index, penyakit_id, bagian_tubuh, content,
-                         source_hash, content_hash, embed_model, embedding)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector)
-                    ON CONFLICT (source_type, source_id, chunk_index) DO UPDATE SET
-                        penyakit_id     = EXCLUDED.penyakit_id,
-                        bagian_tubuh    = EXCLUDED.bagian_tubuh,
-                        content         = EXCLUDED.content,
-                        source_hash     = EXCLUDED.source_hash,
-                        content_hash    = EXCLUDED.content_hash,
-                        embed_model     = EXCLUDED.embed_model,
-                        embedding       = EXCLUDED.embedding,
-                        diperbarui_pada = CURRENT_TIMESTAMP
-                    """,
-                    (
-                        row["source_type"],
-                        row["source_id"],
-                        row["chunk_index"],
-                        row["penyakit_id"],
-                        row["bagian_tubuh"],
-                        row["content"],
-                        row["source_hash"],
-                        row["content_hash"],
-                        EMBEDDING_MODEL,
-                        to_vector_literal(vector),
-                    ),
-                )
+        for p, vector in zip(to_embed, vectors):
+            conn.execute(
+                """
+                INSERT INTO knowledge_embeddings
+                    (source_type, source_id, chunk_index, penyakit_id, bagian_tubuh, content,
+                     source_hash, content_hash, embed_model, embedding)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector)
+                ON CONFLICT (source_type, source_id, chunk_index) DO UPDATE SET
+                    penyakit_id     = EXCLUDED.penyakit_id,
+                    bagian_tubuh    = EXCLUDED.bagian_tubuh,
+                    content         = EXCLUDED.content,
+                    source_hash     = EXCLUDED.source_hash,
+                    content_hash    = EXCLUDED.content_hash,
+                    embed_model     = EXCLUDED.embed_model,
+                    embedding       = EXCLUDED.embedding,
+                    diperbarui_pada = CURRENT_TIMESTAMP
+                """,
+                (
+                    p["source_type"], p["source_id"], p["chunk_index"],
+                    p["penyakit_id"], p["bagian_tubuh"], p["content"],
+                    p["source_hash"], p["content_hash"], EMBEDDING_MODEL,
+                    to_vector_literal(vector),
+                ),
+            )
 
-        per_source = {
-            r["source_type"]: r["n"]
-            for r in conn.execute(
-                "SELECT source_type, count(*)::int AS n FROM knowledge_embeddings "
-                "GROUP BY source_type ORDER BY source_type"
-            ).fetchall()
-        }
+        # Chunk yang isinya tidak berubah hanya dimutakhirkan metadatanya
+        # (penyakit_id / bagian_tubuh bisa saja berubah tanpa isi berubah).
+        for p in unchanged_meta:
+            conn.execute(
+                """
+                UPDATE knowledge_embeddings
+                SET penyakit_id = %s, bagian_tubuh = %s, source_hash = %s
+                WHERE source_type = %s AND source_id = %s AND chunk_index = %s
+                """,
+                (
+                    p["penyakit_id"], p["bagian_tubuh"], p["source_hash"],
+                    p["source_type"], p["source_id"], p["chunk_index"],
+                ),
+            )
+
+    n_sources = {SOURCE_DISEASE: 0, SOURCE_FAQ: 0}
+    for st, _sid in by_source:
+        n_sources[st] = n_sources.get(st, 0) + 1
+
+    per_source = {
+        r["source_type"]: r["n"]
+        for r in conn.execute(
+            "SELECT source_type, count(*)::int AS n FROM knowledge_embeddings "
+            "GROUP BY source_type ORDER BY source_type"
+        ).fetchall()
+    }
 
     total = sum(per_source.values())
-    summary = {
+    return {
         "total": total,
         "per_source": per_source,
         "sumber": n_sources,
-        "chunk_terembed": len(planned),
-        "sumber_berubah": len(changed),
-        "sumber_tidak_berubah": unchanged,
-        "sumber_dihapus": len(stale_sources),
+        "chunk_terembed": len(to_embed),
+        "sumber_berubah": changed_sources,
+        "sumber_tidak_berubah": len(by_source) - changed_sources,
+        "sumber_dihapus": len([k for k in stored if k not in by_source]),
         "model": EMBEDDING_MODEL,
-        "chunk_tokens": CHUNK_TOKENS,
-        "durasi_detik": round(time.perf_counter() - started, 2),
     }
-    log(
-        f"Selesai: {total} chunk dari {sum(n_sources.values())} sumber "
-        f"dalam {summary['durasi_detik']}s"
-    )
-    return summary

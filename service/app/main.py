@@ -2,6 +2,7 @@ import secrets
 
 import psycopg
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
+from pydantic import BaseModel
 
 from app import db
 from app.config import (
@@ -14,7 +15,7 @@ from app.config import (
     RAG_ADMIN_TOKEN,
 )
 from app.schemas.chat import ChatRequest
-from app.services.ingestion import IngestError, run_ingest
+from app.services.ingestion import IngestError, ingest_article, run_ingest
 from app.services.retrieval import retrieve_chunks, is_out_of_scope
 from app.services.generation import generate_answer
 from app.services.model_loader import load_registry
@@ -26,6 +27,10 @@ OUT_OF_SCOPE_ANSWER = (
     "cara menggunakan website ini. Silakan hubungi tenaga medis profesional "
     "untuk konsultasi kesehatan."
 )
+
+class IngestArticleRequest(BaseModel):
+    id_artikel: int
+
 
 app = FastAPI(title="Web Paru-Paru Service API", version="2.0.0")
 
@@ -137,9 +142,44 @@ async def prediksi(image: UploadFile = File(...)):
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Gagal memproses gambar: {exc}") from exc
 
+def _require_admin_token(header_value: str):
+    if not RAG_ADMIN_TOKEN:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "RAG_ADMIN_TOKEN belum diatur di service/.env, sehingga endpoint "
+                "sinkronisasi dinonaktifkan demi keamanan."
+            ),
+        )
+    if not secrets.compare_digest(header_value, RAG_ADMIN_TOKEN):
+        raise HTTPException(status_code=401, detail="Token admin tidak valid")
+
+
+@app.post("/api/ingest-article")
+def ingest_article_endpoint(
+    request: IngestArticleRequest,
+    x_rag_admin_token: str = Header(default=""),
+):
+    """Sinkronkan chunk SATU artikel setelah disimpan lewat PUT BFF.
+
+    Dipicu BFF secara fire-and-forget setelah respons PUT dikirim, supaya
+    penyimpanan konten tidak menunggu embedding. Perlindungan sama dengan
+    /api/load-knowledge: header `X-Rag-Admin-Token`.
+    """
+    _require_admin_token(x_rag_admin_token)
+    try:
+        return ingest_article(request.id_artikel, log=lambda *_args: None)
+    except IngestError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except psycopg.Error as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Gagal sinkronisasi artikel: {exc}"
+        ) from exc
+
+
 @app.post("/api/load-knowledge")
 def load_knowledge(x_rag_admin_token: str = Header(default="")):
-    """Sinkronkan ulang embedding knowledge base dari `artikel_bagian` + `faq`.
+    """Sinkronkan ulang embedding knowledge base dari `artikel` + `faq`.
 
     Dipicu tombol "Sinkronkan Basis Pengetahuan" di Admin Dashboard lewat BFF.
     Service Python yang menangani semuanya: ambil data -> chunk -> embed (lokal)
@@ -152,17 +192,7 @@ def load_knowledge(x_rag_admin_token: str = Header(default="")):
     Dijalankan sinkron: embedding lokal untuk korpus kecil hanya butuh beberapa
     detik, jadi tidak perlu pola background job + polling.
     """
-    if not RAG_ADMIN_TOKEN:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "RAG_ADMIN_TOKEN belum diatur di service/.env, sehingga endpoint "
-                "sinkronisasi dinonaktifkan demi keamanan."
-            ),
-        )
-    if not secrets.compare_digest(x_rag_admin_token, RAG_ADMIN_TOKEN):
-        raise HTTPException(status_code=401, detail="Token admin tidak valid")
-
+    _require_admin_token(x_rag_admin_token)
     try:
         return run_ingest(log=lambda *_args: None)
     except IngestError as exc:

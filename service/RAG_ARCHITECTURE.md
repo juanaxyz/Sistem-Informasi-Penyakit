@@ -10,7 +10,7 @@
 
 ## Prinsip utama
 
-1. **Tabel relational (`penyakit`, `artikel`, `artikel_bagian`, `faq`) tetap single source of truth** untuk data yang ditampilkan di halaman web dan sekaligus sumber embedding.
+1. **Tabel relational (`penyakit`, `artikel`, `faq`) tetap single source of truth** untuk data yang ditampilkan di halaman web dan sekaligus sumber embedding.
 2. **Tabel `knowledge_embeddings`** adalah lapisan tambahan khusus chatbot — representasi vector dari konten yang sama (data penyakit) ditambah konten FAQ navigasi.
 3. Chatbot **tidak pernah** melakukan function calling / tool selection. Alurnya selalu sama: embed → similarity search → generate jawaban.
 
@@ -18,8 +18,8 @@
 
 | # | Aspek | Keputusan |
 |---|-------|-----------|
-| 1 | Sumber data disease | Tabel asli `penyakit` + `artikel_bagian` (BUKAN tabel `diseases`/`konten_penyakit` imajiner). `artikel_bagian` di-`JOIN` ke `artikel` lalu `penyakit` untuk nama. |
-| 2 | Granularitas chunk disease | Sumber = 1 baris `artikel_bagian`, dipecah jadi **beberapa chunk 256 token** (overlap 32). `source_id = artikel_bagian.id`, `chunk_index` = urutan. |
+| 1 | Sumber data disease | Tabel asli `penyakit` + `artikel` (satu HTML Quill per penyakit, sudah disanitasi BFF) (BUKAN tabel `diseases`/`konten_penyakit` imajiner). |
+| 2 | Granularitas chunk disease | Sumber = 1 `artikel`, dipecah **per heading `<h2>`** (isi `<h3>` ikut bagian `<h2>`-nya). Bagian yang lebih panjang dari 256 token dipecah lagi per paragraf. `source_id = artikel.id`, `chunk_index` = urutan. |
 | 3 | Format `content` disease | Tiap chunk diawali header konteks `Nama: {nama_penyakit}\nBagian: {judul}` lalu isi chunk-nya, supaya potongan tengah tetap bisa membaca diri sendiri. Baris dengan `judul` kosong dilewati baris `Bagian:`-nya. |
 | 4 | Model embedding | `LazarusNLP/all-indo-e5-small-v4` via `sentence-transformers`, **384 dimensi, lokal, L2-normalized**. Tanpa prefix `query:`/`passage:`, jadi `task_type` tidak relevan. |
 | 5 | Model generation | `gemini-3.6-flash` — `gemini-2.0-flash` sudah retired di Gemini API (404), cek versi terbaru bila perlu. Gemini **hanya** menyusun jawaban. |
@@ -80,17 +80,17 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_penyakit
 Catatan:
 - Tidak ada trigger `updated_at` — `diperbarui_pada` di-`SET` eksplisit saat upsert.
 - **Tidak ada RLS** lagi. Service memakai user PostgreSQL biasa, bukan service role. Pastikan user tersebut punya `INSERT`/`SELECT`/`DELETE` pada tabel ini.
-- Unique `(source_type, source_id)` aman karena id disease berasal dari `artikel_bagian` dan id FAQ dari `faq`, sedangkan `source_type` membedakannya.
+- Unique `(source_type, source_id, chunk_index)` — satu artikel menghasilkan beberapa chunk (sebelumnya satu baris `artikel_bagian` per chunk; tabel itu sudah dihapus).
 - **`content_hash`** = SHA-256 dari `content`, dipakai `ingest.py` untuk melewati embedding yang tidak berubah.
 
 ## Aturan penyusunan `content` per source_type
 
-### Untuk `source_type = 'disease'` (1 baris per `artikel_bagian`)
+### Untuk `source_type = 'disease'` (1 artikel, satu chunk per `<h2>`)
 
 ```
 Nama: {penyakit.nama}
-Bagian: {artikel_bagian.judul}
-{konten}
+Bagian: {teks heading <h2>}
+{teks polos bagian tersebut}
 ```
 
 Contoh nyata:
@@ -100,8 +100,8 @@ Bagian: Pengertian & Ringkasan
 Coronavirus adalah keluarga besar virus yang dapat menyebabkan penyakit ...
 ```
 
-- `source_id = artikel_bagian.id`
-- `penyakit_id = artikel.id_penyakit` (dari tabel `artikel`)
+- `source_id = artikel.id`
+- `penyakit_id = artikel.id_penyakit`
 - Baris dengan `konten` kosong/spasi dilewati (tidak di-embed).
 - `judul` kosong → baris `Bagian:` dihilangkan, sisanya tetap.
 
@@ -120,14 +120,14 @@ Jawaban: {faq.jawaban}
 
 Jalankan `ingest.py` dari local (atau klik tombol di Admin Dashboard):
 
-1. Baca semua `artikel_bagian` yang punya konten, di-`JOIN` ke `artikel` + `penyakit` ? susun `source_type = 'disease'`.
+1. Baca semua `artikel` yang `konten`-nya tidak kosong, di-`JOIN` ke `penyakit`, dipecah per `<h2>` menjadi bagian ? susun `source_type = 'disease'`.
 2. Baca semua `faq` dengan pertanyaan & jawaban terisi ? susun `source_type = 'faq'`.
 3. Pecah tiap sumber jadi chunk 256 token (overlap 32) memakai tokenizer model.
 4. Hitung `source_hash` (hash konten mentah sumber) dan `content_hash` (hash tiap
    chunk final).
-5. **Full rebuild**: semua chunk di-embed ulang lalu upsert. Tidak ada logika
-   skip — embedding lokal hanya ~20 ms/chunk, jadi tidak ada biaya API yang perlu
-   dihindari, dan rebuild total menjamin nol risiko data basi. Hash dipakai
+5. **Embed hanya yang berubah**: chunk yang `content_hash`-nya tidak berubah
+   (dan `embed_model` sama) tidak di-embed ulang; chunk lama dengan
+   `chunk_index` di luar jumlah baru dihapus. Hash tetap
    untuk **laporan** ke admin (`sumber_berubah` / `sumber_tidak_berubah`).
 6. Hapus chunk yang tak lagi berlaku: sumber yang hilang, dan `chunk_index` =
    jumlah chunk baru (ekor sisa saat konten dipendekkan).
@@ -236,16 +236,16 @@ requests
 ## Larangan untuk agent
 
 - Jangan bangun mekanisme function calling / tool selection.
-- Jangan pakai tabel `diseases`, `konten_penyakit`, atau `gambar_konten` imajiner dari versi doc lama — sumber nyata adalah `penyakit` + `artikel` + `artikel_bagian` + `faq`.
+- Jangan pakai tabel `diseases`, `konten_penyakit`, atau `gambar_konten` imajiner dari versi doc lama — sumber nyata adalah `penyakit` + `artikel` + `faq`.
 - Jangan kembalikan Supabase sebagai sumber data RAG.
 - Jangan gunakan ivfflat — index sudah HNSW.
 - Jangan install dependensi Python di WSL (env conda ada di Windows).
 - Jangan naikkan `CHUNK_TOKENS` di atas `MODEL_MAX_SEQ_LENGTH` - model akan memotong ekor chunk secara diam-diam (default SentenceTransformer 128 harus di-override ke 512).
 - Jangan pakai prefix `query:` / `passage:` saat embedding - model Indonesian E5 ini dilatih tanpa prefix dan prefix menurunkan skor.
-- Jangan andalkan hash untuk skip embedding - full rebuild memang disengaja; hash hanya untuk laporan.
+- Jangan embed ulang chunk yang `content_hash`-nya unchanged - skip berdasar hash sekarang disengaja (PUT artikel memicu re-embed satu artikel).
 - Jangan hardcode threshold di dalam kode runtime — jadikan konstanta di `config.py` agar mudah dikalibrasi.
 - Jangan lupa `penyakit_id` saat seeding chunk disease — tanpa itu link `/penyakit/{id}` tidak pernah muncul di jawaban.
-- Jangan hanya baca `artikel.konten` — kolom itu legacy dan kosong; konten nyata ada di `artikel_bagian`.
+- Jangan embed HTML mentah — `content` wajib teks polos (`html_split.split_sections` + `chunk_section`).
 
 ## Status implementasi saat ini (untuk panduan agent)
 
