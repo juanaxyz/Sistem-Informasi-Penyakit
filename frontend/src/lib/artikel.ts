@@ -20,7 +20,7 @@ export const GAMBAR_DIIZINKAN = ["image/jpeg", "image/png", "image/webp"];
  * backend tetap sumber kebenaran saat menyimpan.
  */
 const ALLOWED_TAGS = [
-  "h2", "h3", "p", "br", "strong", "em", "u", "s",
+  "h1", "h2", "h3", "p", "br", "strong", "em", "u", "s",
   "ul", "ol", "li", "blockquote", "a", "img",
 ];
 const ALLOWED_ATTR = ["href", "target", "rel", "src", "alt", "id"];
@@ -65,7 +65,7 @@ const sanitize = {
     if (typeof window === "undefined" || !raw) return raw ?? "";
     const doc = new DOMParser().parseFromString(raw, "text/html");
     const used = new Set<string>();
-    doc.querySelectorAll("h2, h3").forEach((el) => {
+    doc.querySelectorAll("h1, h2, h3").forEach((el) => {
       const id = uniqueAnchor(slugifyAnchor(el.textContent ?? ""), used);
       el.id = id;
     });

@@ -82,7 +82,7 @@ export interface DiseaseDetail {
   thumbnail: string | null;
   tingkat_urgensi: UrgencyLevel;
   sistem_tubuh: Pick<SystemRecord, "id" | "nama"> | null;
-  artikel: Artikel[];
+  artikel: Artikel | Artikel[] | null;
   bagian_tubuh: Pick<BodyPartRecord, "id" | "nama">[];
   referensi: Referensi[];
   patogen?: Patogen[];

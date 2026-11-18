@@ -38,7 +38,7 @@ export function ArtikelEditor({
   value,
   onChange,
   disabled = false,
-}: ArtikelEditorProps) {  const toolbarRef = useRef<HTMLDivElement>(null);
+}: ArtikelEditorProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<Quill | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,7 +99,7 @@ export function ArtikelEditor({
   };
 
   useEffect(() => {
-    if (!wrapperRef.current || !toolbarRef.current) return;
+    if (!wrapperRef.current) return;
 
     /**
      * Buat node container baru tiap kali effect jalan (StrictMode
@@ -118,7 +118,13 @@ export function ArtikelEditor({
       formats: EDITOR_FORMATS,
       modules: {
         toolbar: {
-          container: toolbarRef.current,
+          container: [
+            [{ header: [1, 2, 3, false] }],
+            ["bold", "italic", "underline", "strike"],
+            [{ list: "ordered" }, { list: "bullet" }],
+            ["blockquote"],
+            ["link", "image"],
+          ],
           handlers: {
             // Ganti handler bawaan (base64) dengan pilih file -> upload.
             image: () => {
@@ -205,16 +211,11 @@ export function ArtikelEditor({
 
   return (
     <div className="w-full">
-      <div ref={toolbarRef} className="border border-border rounded-t-lg bg-card" />
-      {/* `article-prose` membungkus editor agar styling di editor sama dengan
-          tampilan publik; max-width 65ch-nya ditim supaya editor melebar penuh. */}
-      <div className="article-prose" style={{ maxWidth: "none" }}>
-        <div
-          ref={wrapperRef}
-          style={{ minHeight: "400px" }}
-          className="border border-t-0 border-border rounded-b-lg bg-background text-ink"
-        />
-      </div>
+      <div
+        ref={wrapperRef}
+        style={{ minHeight: "400px" }}
+        className="bg-background text-ink"
+      />
       <input
         ref={fileInputRef}
         type="file"

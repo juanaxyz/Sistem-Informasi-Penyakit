@@ -304,27 +304,35 @@ export function DiseaseDetailPage() {
                 </div>
               )}
             </header>
-          {data.artikel.length > 0 ? (
-            <div className="mt-6 space-y-8">
-              {data.artikel.map((article) =>
-                // Artikel tanpa konten tidak ditampilkan; empty state ada di bawah.
-                !isEmptyKonten(article.konten) ? (
+          {(() => {
+            const artikelList = Array.isArray(data.artikel)
+              ? data.artikel
+              : data.artikel
+                ? [data.artikel]
+                : [];
+            const artikelAda = artikelList.filter(
+              (a) => !isEmptyKonten(a.konten),
+            );
+
+            return artikelAda.length > 0 ? (
+              <div className="mt-6 space-y-8">
+                {artikelAda.map((article) => (
                   <ArticleProse key={article.id} onTocChange={setTocItems}>
                     {article.konten}
                   </ArticleProse>
-                ) : null,
-              )}
-            </div>
-          ) : (
-            <div className="mt-8 rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
-              <p className="text-sm font-medium text-ink">
-                Belum ada artikel untuk penyakit ini
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Konten edukasi akan tersedia setelah diterbitkan oleh admin.
-              </p>
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="mt-8 rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
+                <p className="text-sm font-medium text-ink">
+                  Belum ada artikel untuk penyakit ini
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Konten edukasi akan tersedia setelah diterbitkan oleh admin.
+                </p>
+              </div>
+            );
+          })()}
           {data.bagian_tubuh.length > 0 && (
             <section className="mt-8 md:mt-10">
               <ArticleHeading>Bagian tubuh terkait</ArticleHeading>

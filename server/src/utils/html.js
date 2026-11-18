@@ -12,6 +12,7 @@ const config = require("../config");
  */
 const SANITIZE_OPTIONS = {
   allowedTags: [
+    "h1",
     "h2",
     "h3",
     "p",
