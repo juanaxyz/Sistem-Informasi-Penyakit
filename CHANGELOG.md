@@ -2,6 +2,37 @@
 
 Catatan perubahan penting pada project.
 
+## [2026-11-17] — Artikel sebagai satu HTML Quill ( artikel_bagian dihapus)
+
+### Perubahan
+
+- Tabel `artikel` menyimpan **satu HTML hasil editor Quill per penyakit** pada
+  `konten` (sudah disanitasi backend) dan `konten_teks` versi teks polos.
+  Tabel `artikel_bagian` dihapus (migrasi terpisah, `002`).
+- Migrasi `001` (`server/db/migrations/`) menggabungkan `artikel_bagian`
+  berurutan menjadi satu HTML (`<h2>{judul/tipe}</h2>` + paragraf);
+  `node scripts/backfill-konten-teks.js` mengisi `konten_teks` memakai fungsi
+  aplikasi (`src/utils/html.js`), bukan SQL regex. Index trgm pada
+  `konten_teks`.
+- Endpoint sesuai kontrak: `GET`/`PUT /api/artikel/:id_penyakit` (PUT admin
+  only, 422 bila kosong/200 KB) dan `POST /api/artikel/upload-gambar` (admin,
+  magic bytes jpg/png/webp, maks 2 MB, nama UUID). Sanitasi memakai
+  `sanitize-html` (whitelist Quill; `<a target="_blank" rel="noopener
+  noreferrer">`; `<img>` hanya dari `/uploads` sendiri).
+- RAG: chunk `source_type='disease'` kini per heading `<h2>` dari satu artikel
+  (`source_id = artikel.id`), teks polos, perubahan dideteksi lewat
+  `content_hash` (chunk unchanged tidak di-embed ulang, chunk basi dihapus).
+  PUT artikel memicu `POST /api/ingest-article` di service secara
+  fire-and-forget; `python ingest.py` tetap untuk backfill penuh.
+
+### Catatan risiko
+
+- ROLLBACK migrasi 002 (DROP `artikel_bagian`) tidak memulihkan data — backup
+  dulu.
+- Migrasi 001 menganggap `artikel_bagian.konten` lama adalah **teks polos**;
+  bila ada HTML Quill tersisa dari versi yang pernah diterapkan, escape
+  ganda bisa terjadi — periksa sampel sebelum 002.
+
 ## [2026-09-26] — Referensi penyakit, editor artikel, dan tampilan baca
 
 ### Fitur
