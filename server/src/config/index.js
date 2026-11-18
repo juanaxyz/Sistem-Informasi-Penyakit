@@ -35,6 +35,9 @@ module.exports = {
       : true,
   },
   ragApiUrl: process.env.RAG_API_URL || "http://localhost:8000",
+  // Basis URL publik untuk file unggahan (kontrak artikel: kembalikan URL
+  // penuh, dan batasi <img src> ke host+path ini). Wajib diatur di produksi.
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 4000}`).replace(/\/+$/, ""),
   // Token yang dibagikan ke service Python untuk endpoint yang memodifikasi
   // data (sinkronisasi embedding). Kosong => BFF tidak mengirim header itu dan
   // service akan menolak sinkronisasi dengan 503. Harus sama dengan

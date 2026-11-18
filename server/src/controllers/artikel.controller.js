@@ -1,29 +1,92 @@
 const { query } = require("../db/pg");
 const { validateId } = require("../utils/validators");
+const {
+  sanitizeArtikelHtml,
+  htmlToPlainText,
+  isEmptyArtikelHtml,
+} = require("../utils/html");
 const AppError = require("../utils/AppError");
+const config = require("../config");
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+
+const MAX_KONTEN_BYTES = 200 * 1024;
+const STATUS_ALLOWED = ["draft", "terbit"];
+
+/**
+ * Deteksi tipe gambar dari magic bytes buffer, bukan dari ekstensi nama file
+ * atau header Content-Type (keduanya mudah dipalsukan).
+ */
+const IMAGE_SIGNATURES = [
+  {
+    ext: ".png",
+    match: (b) =>
+      b.length >= 8 &&
+      b[0] === 0x89 &&
+      b[1] === 0x50 &&
+      b[2] === 0x4e &&
+      b[3] === 0x47 &&
+      b[4] === 0x0d &&
+      b[5] === 0x0a &&
+      b[6] === 0x1a &&
+      b[7] === 0x0a,
+  },
+  {
+    ext: ".jpg",
+    match: (b) =>
+      b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+  },
+  {
+    ext: ".webp",
+    match: (b) =>
+      b.length >= 12 &&
+      b.toString("ascii", 0, 4) === "RIFF" &&
+      b.toString("ascii", 8, 12) === "WEBP",
+  },
+];
+
+const detectImageType = (buffer) =>
+  IMAGE_SIGNATURES.find((sig) => sig.match(buffer)) ?? null;
+
+/**
+ * Picu re-embedding satu artikel di service Python. Dijalankan SETELAH
+ * respons dikirim (fire-and-forget) agar PUT tidak lambat; kegagalan hanya
+ * dicatat — admin tetap bisa sinkronisasi penuh lewat dashboard.
+ */
+const triggerReembed = (idArtikel) => {
+  if (!config.ragAdminToken) {
+    console.warn(
+      "[artikel] RAG_ADMIN_TOKEN belum diatur, re-embedding dilewati",
+    );
+    return;
+  }
+  fetch(`${config.ragApiUrl}/api/ingest-article`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Rag-Admin-Token": config.ragAdminToken,
+    },
+    body: JSON.stringify({ id_artikel: idArtikel }),
+  }).catch((err) => {
+    console.error(`[artikel] re-embedding artikel ${idArtikel} gagal:`, err.message);
+  });
+};
 
 const handleGetArtikelList = async (_req, res) => {
   const { rows } = await query(
-    `SELECT a.id, a.id_penyakit, p.nama AS penyakit_nama,
-            ab.id AS first_bagian_id, ab.judul, ab.konten
+    `SELECT a.id, a.id_penyakit, p.nama AS penyakit_nama, a.status,
+            a.diperbarui_pada
      FROM artikel a
      JOIN penyakit p ON p.id = a.id_penyakit
-     LEFT JOIN LATERAL (
-       SELECT id, judul, konten
-       FROM artikel_bagian
-       WHERE id_artikel = a.id
-       ORDER BY urutan ASC
-       LIMIT 1
-     ) ab ON TRUE
      ORDER BY a.id_penyakit, a.id`,
   );
   const artikelList = rows.map((a) => ({
     id: a.id,
     id_penyakit: a.id_penyakit,
-    judul: a.judul ?? "",
-    konten: a.konten ?? "",
+    status: a.status,
     penyakit_nama: a.penyakit_nama ?? "",
-    firstBagianId: a.first_bagian_id ?? null,
+    diperbarui_pada: a.diperbarui_pada,
   }));
   res.json({ artikel: artikelList });
 };
@@ -50,7 +113,7 @@ const handleCreateArtikel = async (req, res) => {
   const { rows } = await query(
     `INSERT INTO artikel (id_penyakit, status)
      VALUES ($1, 'draft')
-     RETURNING id, id_penyakit, status, dibuat_pada`,
+     RETURNING id, id_penyakit, status, diperbarui_pada`,
     [idPenyakit],
   );
   const artikel = rows[0];
@@ -59,132 +122,129 @@ const handleCreateArtikel = async (req, res) => {
     artikel: {
       id: artikel.id,
       id_penyakit: artikel.id_penyakit,
-      judul: "",
-      konten: "",
+      status: artikel.status,
       penyakit_nama: penyakit.nama,
     },
   });
 };
 
-const handleUpdateArtikel = async (req, res) => {
-  const idArtikel = validateId(req.params.idArtikel);
-  if (idArtikel === null) throw new AppError("id artikel tidak valid", 400);
-  const { konten } = req.body;
-  if (konten === undefined) throw new AppError("konten harus disediakan", 400);
-
-  await query(
-    `WITH first_bagian AS (
-       SELECT id FROM artikel_bagian
-       WHERE id_artikel = $1
-       ORDER BY urutan ASC
-       LIMIT 1
-     )
-     UPDATE artikel_bagian ab
-     SET konten = $2, diperbarui_pada = CURRENT_TIMESTAMP
-     FROM first_bagian fb
-     WHERE ab.id = fb.id`,
-    [idArtikel, konten],
-  );
+const handleGetArtikelByPenyakit = async (req, res) => {
+  const idPenyakit = validateId(req.params.idPenyakit);
+  if (idPenyakit === null) throw new AppError("id penyakit tidak valid", 400);
 
   const { rows } = await query(
-    `SELECT a.id, a.id_penyakit, p.nama AS penyakit_nama,
-            ab.judul, ab.konten
-     FROM artikel a
-     JOIN penyakit p ON p.id = a.id_penyakit
-     LEFT JOIN artikel_bagian ab ON ab.id_artikel = a.id
-     WHERE a.id = $1
-     ORDER BY ab.urutan ASC
+    `SELECT id, id_penyakit, status, konten, ditinjau_pada, diperbarui_pada
+     FROM artikel
+     WHERE id_penyakit = $1
+     ORDER BY id DESC
      LIMIT 1`,
-    [idArtikel],
+    [idPenyakit],
   );
-  const artikelData = rows[0];
-  if (!artikelData) throw new AppError("id artikel tidak valid", 400);
+  const artikel = rows[0];
+  if (!artikel) throw new AppError("artikel untuk penyakit ini tidak ditemukan", 404);
 
-  const updatedArtikel = {
-    id: artikelData.id,
-    id_penyakit: artikelData.id_penyakit,
-    judul: artikelData.judul ?? "",
-    konten: artikelData.konten ?? "",
-    penyakit_nama: artikelData.penyakit_nama ?? "",
-  };
-  res.json({ artikel: updatedArtikel });
+  res.json(artikel);
 };
 
-const handleGetArtikelBagian = async (req, res) => {
-  const idArtikel = validateId(req.params.idArtikel);
-  if (idArtikel === null) throw new AppError("id artikel tidak valid", 400);
+const handleUpdateArtikelByPenyakit = async (req, res) => {
+  const idPenyakit = validateId(req.params.idPenyakit);
+  if (idPenyakit === null) throw new AppError("id penyakit tidak valid", 400);
 
-  const { rows } = await query(
-    `SELECT id, id_artikel, tipe, judul, konten, urutan, dibuat_pada, diperbarui_pada
-     FROM artikel_bagian
-     WHERE id_artikel = $1
-     ORDER BY urutan ASC`,
-    [idArtikel],
+  const { konten, status } = req.body ?? {};
+  if (typeof konten !== "string") {
+    throw new AppError("konten harus disediakan", 422, { field: "konten" });
+  }
+  if (
+    status !== undefined &&
+    (typeof status !== "string" || !STATUS_ALLOWED.includes(status))
+  ) {
+    throw new AppError(`status harus salah satu dari ${STATUS_ALLOWED.join(", ")}`, 422, {
+      field: "status",
+    });
+  }
+
+  if (Buffer.byteLength(konten, "utf8") > MAX_KONTEN_BYTES) {
+    throw new AppError(
+      `konten melebihi batas ${MAX_KONTEN_BYTES} byte`,
+      422,
+      { field: "konten" },
+    );
+  }
+
+  const sanitized = sanitizeArtikelHtml(konten);
+  if (isEmptyArtikelHtml(sanitized)) {
+    throw new AppError("konten tidak boleh kosong", 422, { field: "konten" });
+  }
+  const kontenTeks = htmlToPlainText(sanitized);
+
+  const { rows: penyakitRows } = await query(
+    `SELECT id FROM penyakit WHERE id = $1 LIMIT 1`,
+    [idPenyakit],
   );
-  res.json({ bagian: rows });
+  if (!penyakitRows[0]) throw new AppError("Penyakit tidak ditemukan", 404);
+
+  const { rows: existing } = await query(
+    `SELECT id FROM artikel WHERE id_penyakit = $1 ORDER BY id DESC LIMIT 1`,
+    [idPenyakit],
+  );
+
+  let idArtikel;
+  let diperbaruiPada;
+  if (existing[0]) {
+    idArtikel = existing[0].id;
+    const { rows } = await query(
+      `UPDATE artikel
+       SET konten = $1, konten_teks = $2${status !== undefined ? ", status = $4" : ""},
+           diperbarui_pada = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING id, diperbarui_pada`,
+      status !== undefined
+        ? [sanitized, kontenTeks, idArtikel, status]
+        : [sanitized, kontenTeks, idArtikel],
+    );
+    diperbaruiPada = rows[0].diperbarui_pada;
+  } else {
+    const { rows } = await query(
+      `INSERT INTO artikel (id_penyakit, status, konten, konten_teks)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, diperbarui_pada`,
+      [idPenyakit, status ?? "draft", sanitized, kontenTeks],
+    );
+    idArtikel = rows[0].id;
+    diperbaruiPada = rows[0].diperbarui_pada;
+  }
+
+  res.json({ id: idArtikel, konten: sanitized, diperbarui_pada: diperbaruiPada });
+  triggerReembed(idArtikel);
 };
 
-const handleSaveArtikelBagian = async (req, res) => {
-  const idArtikel = validateId(req.params.idArtikel);
-  if (idArtikel === null) throw new AppError("id artikel tidak valid", 400);
-  const { bagian } = req.body;
-  if (!Array.isArray(bagian)) throw new AppError("bagian harus berupa array", 400);
-
-  const { rows: currentRows } = await query(
-    `SELECT id FROM artikel_bagian WHERE id_artikel = $1`,
-    [idArtikel],
-  );
-  const currentIds = currentRows.map((b) => b.id);
-  const updatedIds = [];
-
-  for (let i = 0; i < bagian.length; i++) {
-    const b = bagian[i];
-    const urutan = b.urutan ?? i + 1;
-    const judul = b.judul ?? null;
-    const konten = b.konten ?? "";
-    const tipe = b.tipe ?? "lainnya";
-
-    if (b.id && currentIds.includes(b.id)) {
-      await query(
-        `UPDATE artikel_bagian
-         SET judul = $1, konten = $2, tipe = $3, urutan = $4,
-             diperbarui_pada = CURRENT_TIMESTAMP
-         WHERE id = $5`,
-        [judul, konten, tipe, urutan, b.id],
-      );
-      updatedIds.push(b.id);
-    } else {
-      const { rows } = await query(
-        `INSERT INTO artikel_bagian (id_artikel, judul, konten, tipe, urutan)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id`,
-        [idArtikel, judul, konten, tipe, urutan],
-      );
-      if (rows[0]) updatedIds.push(rows[0].id);
-    }
+/** Unggah gambar sisipan konten artikel (lihat routes/artikel.routes.js). */
+const handleUploadGambar = async (req, res) => {
+  if (!req.file) {
+    throw new AppError("file gambar pada field 'gambar' wajib diunggah", 400);
   }
 
-  const toDeleteIds = currentIds.filter((id) => !updatedIds.includes(id));
-  if (toDeleteIds.length > 0) {
-    await query(`DELETE FROM artikel_bagian WHERE id = ANY($1::int[])`, [
-      toDeleteIds,
-    ]);
+  // MIME dari header Content-Type mudah dipalsukan — verifikasi magic bytes
+  // buffer sebelum file ditulis ke disk.
+  const detected = detectImageType(req.file.buffer);
+  if (!detected) {
+    throw new AppError("format gambar tidak didukung (hanya jpg/png/webp)", 415);
   }
 
-  const { rows: finalRows } = await query(
-    `SELECT id, id_artikel, tipe, judul, konten, urutan, dibuat_pada, diperbarui_pada
-     FROM artikel_bagian
-     WHERE id_artikel = $1
-     ORDER BY urutan ASC`,
-    [idArtikel],
-  );
-  res.json({ bagian: finalRows });
+  const dir = path.join(config.uploadsDir, "artikel");
+  await fs.promises.mkdir(dir, { recursive: true });
+  const filename = `${crypto.randomUUID()}${detected.ext}`;
+  await fs.promises.writeFile(path.join(dir, filename), req.file.buffer);
+
+  res.status(201).json({
+    url: `${config.publicBaseUrl}/uploads/artikel/${filename}`,
+  });
 };
 
 module.exports = {
   handleGetArtikelList,
   handleCreateArtikel,
-  handleUpdateArtikel,
-  handleGetArtikelBagian,
-  handleSaveArtikelBagian,
+  handleGetArtikelByPenyakit,
+  handleUpdateArtikelByPenyakit,
+  handleUploadGambar,
 };

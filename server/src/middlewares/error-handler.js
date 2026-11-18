@@ -32,7 +32,7 @@ const errorHandler = (err, req, res, next) => {
   if (err instanceof AppError) {
     return res.status(statusCode).json({
       error: err.message,
-      ...(err.details && { details: err.details }),
+      ...(err.details || {}),
     });
   }
 

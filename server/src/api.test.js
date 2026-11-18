@@ -233,7 +233,7 @@ describe("API Test Suite", () => {
       expect(res.body).toEqual({ error: "penyakit tidak ditemukan" });
     });
 
-    it("harus menggabungkan data penyakit, artikel, bagian tubuh, dan referensi", async () => {
+    it("harus menggabungkan data penyakit, artikel (HTML), bagian tubuh, dan referensi", async () => {
       mockQuery
         .mockResolvedValueOnce(
           ok([
@@ -254,13 +254,10 @@ describe("API Test Suite", () => {
           ok([
             {
               id: 10,
-              status: "published",
+              status: "terbit",
+              konten: "<h2>Pengertian</h2><p>Konten Maag</p>",
               ditinjau_pada: null,
-              bagian_id: 1,
-              tipe: "konten",
-              judul: "Pengertian",
-              urutan: 1,
-              konten: "Konten Maag",
+              diperbarui_pada: "2026-11-16T00:00:00.000Z",
             },
           ]),
         ) // artikel
@@ -283,20 +280,32 @@ describe("API Test Suite", () => {
         thumbnail: null,
         tingkat_urgensi: "normal",
         sistem_tubuh: { id: 2, nama: "Pencernaan" },
-        artikel: [
-          {
-            id: 10,
-            status: "published",
-            ditinjau_pada: null,
-            bagian: [
-              { id: 1, tipe: "konten", judul: "Pengertian", urutan: 1, konten: "Konten Maag" },
-            ],
-          },
-        ],
+        artikel: {
+          id: 10,
+          status: "terbit",
+          konten: "<h2>Pengertian</h2><p>Konten Maag</p>",
+          ditinjau_pada: null,
+          diperbarui_pada: "2026-11-16T00:00:00.000Z",
+        },
         bagian_tubuh: [{ id: 5, nama: "Lambung", tampilan: "depan" }],
         referensi: [{ id: 1, url: "https://example.com" }],
         patogen: [{ id: 7, nama: "Helicobacter pylori", jenis: "bakteri" }],
       });
+    });
+
+    it("harus mengembalikan artikel null jika penyakit tidak punya artikel", async () => {
+      mockQuery
+        .mockResolvedValueOnce(
+          ok([{ id: 3, nama: "Asma", slug: "asma", sistem_id: 1, sistem_nama: "Pernapasan" }]),
+        )
+        .mockResolvedValueOnce(ok([])) // artikel tidak ada
+        .mockResolvedValueOnce(ok([])) // bagian_tubuh
+        .mockResolvedValueOnce(ok([])) // referensi
+        .mockResolvedValueOnce(ok([])); // patogen
+
+      const res = await request(app).get("/api/penyakit/3");
+      expect(res.status).toBe(200);
+      expect(res.body.penyakit.artikel).toBeNull();
     });
 
     it("harus 404 jika slug tidak dikenal (query tidak mengembalikan baris)", async () => {
@@ -942,6 +951,271 @@ describe("API Test Suite", () => {
 
       expect(res.status).toBe(401);
       expect(mockQuery).not.toHaveBeenCalled();
+    });
+  });
+
+  // --- ENDPOINT ARTIKEL (Opsi A: satu HTML Quill per penyakit) ---
+  describe("GET /api/artikel/:idPenyakit", () => {
+    it("harus 400 jika idPenyakit tidak valid", async () => {
+      const res = await request(app).get("/api/artikel/0");
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "id penyakit tidak valid" });
+    });
+
+    it("harus 200 tanpa auth (publik) dan mengembalikan konten HTML", async () => {
+      mockQuery.mockResolvedValueOnce(
+        ok([
+          {
+            id: 10,
+            id_penyakit: 1,
+            status: "terbit",
+            konten: "<h2>Gejala</h2><p>batuk</p>",
+            ditinjau_pada: null,
+            diperbarui_pada: "2026-11-16T00:00:00.000Z",
+          },
+        ]),
+      );
+
+      const res = await request(app).get("/api/artikel/1");
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        id: 10,
+        id_penyakit: 1,
+        status: "terbit",
+        konten: "<h2>Gejala</h2><p>batuk</p>",
+        ditinjau_pada: null,
+        diperbarui_pada: "2026-11-16T00:00:00.000Z",
+      });
+    });
+
+    it("harus 404 jika penyakit belum punya artikel", async () => {
+      mockQuery.mockResolvedValueOnce(ok([]));
+
+      const res = await request(app).get("/api/artikel/999");
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/tidak ditemukan/);
+    });
+  });
+
+  describe("PUT /api/artikel/:idPenyakit (admin only)", () => {
+    const url = "/api/artikel/1";
+    const adminToken = () => signToken({ role: "admin" });
+    const payload = {
+      konten: "<h2>Gejala</h2><p>batuk <script>alert(1)</script><strong>berat</strong></p>",
+    };
+
+    it("harus 401 tanpa token", async () => {
+      const res = await request(app).put(url).send(payload);
+      expect(res.status).toBe(401);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("harus 403 untuk role user", async () => {
+      const res = await request(app)
+        .put(url)
+        .set("Authorization", `Bearer ${signToken({ role: "user" })}`)
+        .send(payload);
+      expect(res.status).toBe(403);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("harus 422 bila konten kosong setelah strip HTML", async () => {
+      const res = await request(app)
+        .put(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ konten: "<p><br></p>" });
+      expect(res.status).toBe(422);
+      expect(res.body).toEqual({ error: expect.any(String), field: "konten" });
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("harus 422 bila konten melebihi 200 KB", async () => {
+      const res = await request(app)
+        .put(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ konten: "<p>" + "a".repeat(210 * 1024) + "</p>" });
+      expect(res.status).toBe(422);
+      expect(res.body).toEqual({ error: expect.any(String), field: "konten" });
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("harus 422 bila status di luar draft/terbit", async () => {
+      const res = await request(app)
+        .put(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ ...payload, status: "published" });
+      expect(res.status).toBe(422);
+      expect(res.body).toEqual({ error: expect.any(String), field: "status" });
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("harus 422 bila konten bukan string", async () => {
+      const res = await request(app)
+        .put(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ konten: 123 });
+      expect(res.status).toBe(422);
+      expect(res.body.field).toBe("konten");
+    });
+
+    it("harus 404 bila penyakit tidak ada", async () => {
+      mockQuery.mockResolvedValueOnce(ok([])); // SELECT penyakit
+
+      const res = await request(app)
+        .put(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send(payload);
+      expect(res.status).toBe(404);
+    });
+
+    it("harus update artikel yang ada, mengembalikan konten tersanitasi, dan picu re-embed", async () => {
+      mockQuery
+        .mockResolvedValueOnce(ok([{ id: 1 }])) // penyakit ada
+        .mockResolvedValueOnce(ok([{ id: 10 }])) // artikel sudah ada
+        .mockResolvedValueOnce(
+          ok([{ id: 10, diperbarui_pada: "2026-11-16T01:00:00.000Z" }]),
+        ); // UPDATE ... RETURNING
+
+      const res = await request(app)
+        .put(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send(payload);
+
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(10);
+      // <script> dibuang, <strong> dipertahankan.
+      expect(res.body.konten).toBe(
+        "<h2>Gejala</h2><p>batuk <strong>berat</strong></p>",
+      );
+      expect(res.body.diperbarui_pada).toBe("2026-11-16T01:00:00.000Z");
+
+      const updateCall = mockQuery.mock.calls.find(
+        ([sql]) => typeof sql === "string" && sql.includes("UPDATE artikel"),
+      );
+      expect(updateCall[1]).toEqual([
+        "<h2>Gejala</h2><p>batuk <strong>berat</strong></p>",
+        // konten_teks: teks polos hasil htmlToPlainText
+        "Gejala\nbatuk berat",
+        10,
+      ]);
+
+      // Re-embedding dijalankan setelah respons dikirim (fire-and-forget).
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/ingest-article"),
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ id_artikel: 10 }),
+        }),
+      );
+    });
+
+    it("harus insert artikel baru bila penyakit belum punya artikel", async () => {
+      mockQuery
+        .mockResolvedValueOnce(ok([{ id: 1 }])) // penyakit ada
+        .mockResolvedValueOnce(ok([])) // artikel belum ada
+        .mockResolvedValueOnce(
+          ok([{ id: 11, diperbarui_pada: "2026-11-16T02:00:00.000Z" }]),
+        ); // INSERT ... RETURNING
+
+      const res = await request(app)
+        .put(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ ...payload, status: "terbit" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(11);
+      const insertCall = mockQuery.mock.calls.find(
+        ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO artikel"),
+      );
+      expect(insertCall[1]).toEqual([
+        1,
+        "terbit",
+        "<h2>Gejala</h2><p>batuk <strong>berat</strong></p>",
+        "Gejala\nbatuk berat",
+      ]);
+    });
+  });
+
+  describe("POST /api/artikel/upload-gambar (admin only)", () => {
+    const url = "/api/artikel/upload-gambar";
+    const adminToken = () => signToken({ role: "admin" });
+    const PNG_HEADER = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
+
+    afterEach(() => {
+      jest.resetAllMocks();
+    });
+
+    it("harus 401 tanpa token", async () => {
+      const res = await request(app).post(url);
+      expect(res.status).toBe(401);
+    });
+
+    it("harus 403 untuk role user", async () => {
+      const res = await request(app)
+        .post(url)
+        .set("Authorization", `Bearer ${signToken({ role: "user" })}`);
+      expect(res.status).toBe(403);
+    });
+
+    it("harus 400 ketika tidak ada file terlampir", async () => {
+      const res = await request(app)
+        .post(url)
+        .set("Authorization", `Bearer ${adminToken()}`);
+      expect(res.status).toBe(400);
+    });
+
+    it("harus 415 untuk file palsu ber-ekstensi .jpg (magic bytes bukan gambar)", async () => {
+      const res = await request(app)
+        .post(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .attach("gambar", Buffer.from("bukan gambar sama sekali"), {
+          filename: "peluru.jpg",
+          contentType: "image/jpeg",
+        });
+      expect(res.status).toBe(415);
+    });
+
+    it("harus 413 untuk file di atas 2 MB", async () => {
+      const res = await request(app)
+        .post(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .attach("gambar", Buffer.alloc(2 * 1024 * 1024 + 1, 0xff), {
+          filename: "besar.png",
+          contentType: "image/png",
+        });
+      expect(res.status).toBe(413);
+    });
+
+    it("harus 201 dan URL publik untuk png valid (nama file UUID)", async () => {
+      const res = await request(app)
+        .post(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .attach("gambar", PNG_HEADER, { filename: "asli.png", contentType: "image/png" });
+
+      expect(res.status).toBe(201);
+      expect(res.body.url).toMatch(
+        /^http:\/\/localhost:4000\/uploads\/artikel\/[0-9a-f-]{36}\.png$/,
+      );
+
+      const fs = require("fs");
+      const path = require("path");
+      const filename = res.body.url.split("/").pop();
+      const filepath = path.join(config.uploadsDir, "artikel", filename);
+      expect(fs.existsSync(filepath)).toBe(true);
+      fs.rmSync(filepath, { force: true });
+    });
+
+    it("harus 415 untuk webp palsu (header RIFF tanpa WEBP)", async () => {
+      const res = await request(app)
+        .post(url)
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .attach("gambar", Buffer.concat([Buffer.from("RIFF\u0000\u0000\u0000\u0000XXXX"), Buffer.alloc(16)]), {
+          filename: "palsu.webp",
+          contentType: "image/webp",
+        });
+      expect(res.status).toBe(415);
     });
   });
 

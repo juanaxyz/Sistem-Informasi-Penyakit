@@ -8,7 +8,6 @@ const handleGetDashboard = async (_req, res) => {
         (SELECT COUNT(*)::int FROM sistem_tubuh) AS sistem_tubuh,
         (SELECT COUNT(*)::int FROM bagian_tubuh) AS bagian_tubuh,
         (SELECT COUNT(*)::int FROM artikel) AS artikel,
-        (SELECT COUNT(*)::int FROM artikel_bagian) AS artikel_bagian,
         (SELECT COUNT(*)::int FROM users) AS users,
         (SELECT COUNT(*)::int FROM riwayat) AS riwayat,
         (SELECT COUNT(*)::int FROM prediksi) AS prediksi

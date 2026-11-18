@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS artikel (
     id             integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_penyakit    integer NOT NULL REFERENCES penyakit(id) ON DELETE CASCADE,
     status         varchar,
-    konten         text,
+    konten         text,                       -- HTML tersanitasi dari editor Quill
+    konten_teks    text,                       -- teks polos hasil strip HTML (backend)
     ditinjau_pada  timestamp,
     dibuat_pada    timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     diperbarui_pada timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -51,18 +52,13 @@ CREATE TABLE IF NOT EXISTS artikel (
 
 CREATE INDEX IF NOT EXISTS artikel_id_penyakit_idx ON artikel(id_penyakit);
 
-CREATE TABLE IF NOT EXISTS artikel_bagian (
-    id             integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    id_artikel     integer NOT NULL REFERENCES artikel(id) ON DELETE CASCADE,
-    tipe           varchar NOT NULL DEFAULT 'lainnya',
-    judul          varchar,
-    konten         text NOT NULL DEFAULT '',
-    urutan         integer NOT NULL DEFAULT 0,
-    dibuat_pada    timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    diperbarui_pada timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+-- Pencarian teks pada konten polos (membutuhkan ekstensi pg_trgm).
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_artikel_konten_teks_trgm
+    ON artikel USING gin (konten_teks gin_trgm_ops);
 
-CREATE INDEX IF NOT EXISTS artikel_bagian_id_artikel_idx ON artikel_bagian(id_artikel);
+-- CATATAN: tabel `artikel_bagian` (skema lama, satu artikel banyak bagian)
+-- sudah dihapus. Lihat db/migrations/ untuk migrasi data + penghapusan.
 
 -- Daftar URL sumber per penyakit, ditampilkan di halaman detail penyakit.
 -- Mengikuti bentuk tabel yang sudah ada di capstone_paru: `id_penyakit` tanpa

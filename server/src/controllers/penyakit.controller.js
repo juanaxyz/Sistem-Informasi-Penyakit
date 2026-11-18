@@ -133,12 +133,11 @@ const handleGetPenyakitDetail = async (req, res) => {
 
   const [artikelRes, bagianRes, referensiRes, patogenRes] = await Promise.all([
     query(
-      `SELECT a.id, a.status, a.ditinjau_pada,
-              ab.id AS bagian_id, ab.tipe, ab.judul, ab.urutan, ab.konten
+      `SELECT a.id, a.status, a.konten, a.ditinjau_pada, a.diperbarui_pada
        FROM artikel a
-       LEFT JOIN artikel_bagian ab ON ab.id_artikel = a.id
        WHERE a.id_penyakit = $1
-       ORDER BY a.id, ab.urutan`,
+       ORDER BY a.id DESC
+       LIMIT 1`,
       [idPenyakit],
     ),
     query(
@@ -163,27 +162,15 @@ const handleGetPenyakitDetail = async (req, res) => {
     ),
   ]);
 
-  const artikelByArt = new Map();
-  for (const row of artikelRes.rows) {
-    if (!artikelByArt.has(row.id)) {
-      artikelByArt.set(row.id, {
-        id: row.id,
-        status: row.status,
-        ditinjau_pada: row.ditinjau_pada,
-        bagian: [],
-      });
-    }
-    if (row.bagian_id != null) {
-      artikelByArt.get(row.id).bagian.push({
-        id: row.bagian_id,
-        tipe: row.tipe,
-        judul: row.judul,
-        urutan: row.urutan,
-        konten: row.konten,
-      });
-    }
-  }
-  const artikel = [...artikelByArt.values()];
+  const artikel = artikelRes.rows[0]
+    ? {
+        id: artikelRes.rows[0].id,
+        status: artikelRes.rows[0].status,
+        konten: artikelRes.rows[0].konten ?? "",
+        ditinjau_pada: artikelRes.rows[0].ditinjau_pada,
+        diperbarui_pada: artikelRes.rows[0].diperbarui_pada,
+      }
+    : null;
 
   const bagian_tubuh = bagianRes.rows.map((r) => ({
     id: r.id,

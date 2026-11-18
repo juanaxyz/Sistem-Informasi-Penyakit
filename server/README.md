@@ -20,9 +20,12 @@ Frontend (Vite)  ──HTTP──▶  BFF (Express, :4000)  ──▶  PostgreSQ
 ```
 server/
 ├── db/
-│   └── schema.sql                 # Skema PostgreSQL (idempotent) — users, riwayat, prediksi, artikel, artikel_bagian, referensi
+│   ├── schema.sql                 # Skema PostgreSQL (idempotent) — users, riwayat, prediksi, artikel, referensi
+│   └── migrations/                # Migrasi SQL berpasangan up/down (lihat scripts/migrate.js)
 ├── scripts/
-│   └── apply-schema.js            # Terapkan schema.sql ke PG lokal (npm run db:schema)
+│   ├── apply-schema.js            # Terapkan schema.sql ke PG lokal (npm run db:schema)
+│   ├── migrate.js                 # Runner migrasi: `node scripts/migrate.js up | down [nama]`
+│   └── backfill-konten-teks.js    # Isi artikel.konten_teks memakai htmlToPlainText aplikasi
 ├── src/
 │   ├── server.js                  # Bootstrap: mount app + listen
 │   ├── app.js                     # Factory Express: middleware global, mount router, 404 + error handler
@@ -78,10 +81,11 @@ Alur request: `app.js → routes/ → middlewares → controllers → query (pg 
    | `CORS_ORIGIN`                  | Origin yang diizinkan, pisahkan koma bila lebih dari satu |
    | `RAG_API_URL`                  | Base URL service Python gabungan RAG + Analisis (default `http://localhost:8000`) |
    | `MODEL_API_URL`                | Override base URL analisis citra bila terpisah (default ikut `RAG_API_URL`) |
+   | `PUBLIC_BASE_URL`              | Basis URL publik untuk URL gambar unggahan artikel (default `http://localhost:4000`) |
 
    > Di production, server **akan menolak start** bila `JWT_SECRET`, `PGPASSWORD`, `PGHOST`, atau `PGDATABASE` kosong (fail-fast).
 
-3. Terapkan skema database (menambah tabel `users`, `riwayat`, `prediksi`, `artikel`, `artikel_bagian`, `referensi`; idempotent):
+3. Terapkan skema database (menambah tabel `users`, `riwayat`, `prediksi`, `artikel`, `referensi`; idempotent):
 
    ```bash
    npm run db:schema
