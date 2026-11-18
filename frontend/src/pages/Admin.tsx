@@ -763,9 +763,9 @@ export default function Admin() {
         <aside className="md:sticky md:top-16 md:h-[calc(100vh-4rem)] bg-card border border-border rounded-xl p-4 flex flex-col gap-4 shadow-sm shrink-0 overflow-hidden">
           <div className="flex items-center justify-between pb-3 border-b border-border">
             <div>
-              <h2 className="font-display text-lg text-ink font-semibold">
+              <h1 className="font-display text-lg text-ink font-semibold">
                 Panel Admin
-              </h2>
+              </h1>
               <p className="text-xs text-muted-foreground">{user?.nama}</p>
             </div>
             <Badge variant="secondary" className="uppercase text-[10px]">
@@ -1281,59 +1281,73 @@ export default function Admin() {
           )}
 
           {editMode === "artikel" && selectedArtikel && (
-            <form onSubmit={handleSaveArtikel} className="space-y-6">
-              <div className="flex items-center justify-between pb-3 border-b border-border">
-                <div>
-                  <h3 className="font-display text-xl text-ink font-semibold">
+            <form onSubmit={handleSaveArtikel} className="space-y-6 admin-artikel-editor">
+              {/* Sticky Top Action Bar: selalu terlihat saat scroll artikel */}
+              <div className="sticky top-16 z-30 -mx-6 -mt-6 mb-6 px-6 py-2.5 bg-card/95 backdrop-blur-md border-b border-border shadow-xs rounded-t-xl flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3 min-w-0">
+                  <h3 className="font-display text-base sm:text-lg text-ink font-semibold truncate max-w-[200px] sm:max-w-xs md:max-w-md">
                     Edit Artikel: {selectedArtikel.penyakit_nama}
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Tulis seluruh isi artikel dalam satu editor. Gunakan
-                    subjudul <strong>H2</strong> untuk bagian (Gejala,
-                    Penyebab, dst.) dan <strong>H3</strong> untuk sub-bagian.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => keluarArtikel("artikel")}
-                >
-                  Batal
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                {/* Status + indikator perubahan belum tersimpan */}
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-                      Status
-                    </label>
+                  <div className="flex items-center gap-1.5">
                     <select
                       value={artikelStatus}
                       onChange={(e) =>
                         setArtikelStatus(e.target.value as ArtikelStatus)
                       }
                       disabled={artikelSaving}
-                      className="rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                      className="rounded-md border border-border bg-background px-2.5 py-1 text-xs text-ink font-medium outline-none focus:border-pine focus:ring-1 focus:ring-pine"
                     >
-                      <option value="draft">Draft (sembunyikan dari publik)</option>
-                      <option value="terbit">Terbit (tampilkan ke publik)</option>
+                      <option value="draft">Draft (sembunyikan)</option>
+                      <option value="terbit">Terbit (publik)</option>
                     </select>
                   </div>
-                  <div className="flex items-center gap-2 pb-1">
-                    {artikelDirty && (
-                      <span className="text-[11px] font-medium text-amber-600">
-                        Belum disimpan
-                      </span>
-                    )}
-                    <span className="text-[11px] text-muted-foreground">
-                      Maks. 200 KB
+                  {artikelDirty ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      Belum disimpan
                     </span>
-                  </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-400 shrink-0">
+                      ✓ Tersimpan
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground hidden md:inline">
+                    (Maks. 200 KB)
+                  </span>
                 </div>
 
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => keluarArtikel("artikel")}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={
+                      artikelSaving ||
+                      artikelEmpty ||
+                      artikelTooLarge ||
+                      !artikelDirty
+                    }
+                    className="bg-pine text-white hover:bg-pine/90 shadow-sm text-xs sm:text-sm font-medium"
+                  >
+                    {artikelSaving ? (
+                      <>
+                        <span className="inline-block h-3.5 w-3.5 mr-1.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        Menyimpan...
+                      </>
+                    ) : (
+                      "Simpan Artikel"
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
                 <ArtikelEditor
                   value={artikelKonten}
                   onChange={setArtikelKonten}
@@ -1387,6 +1401,7 @@ export default function Admin() {
                     id="referensi-input-artikel"
                     type="url"
                     value={referensiInput}
+                    aria-label="URL referensi baru"
                     onChange={(e) => {
                       setReferensiInput(e.target.value);
                       if (referensiError) setReferensiError(null);
@@ -1447,6 +1462,7 @@ export default function Admin() {
                               if (e.key === "Escape")
                                 handleCancelEditReferensi();
                             }}
+                            aria-label="Edit URL referensi"
                             className="w-full bg-transparent text-base sm:text-sm text-ink outline-none"
                           />
                           <Button
@@ -1455,7 +1471,7 @@ export default function Admin() {
                             onClick={() =>
                               handleEditReferensi(index, referensiDraft)
                             }
-                            className="shrink-0 bg-pine text-white hover:bg-pine/90"
+                            className="shrink-0 bg-pine text-white hover:bg-pine/90 min-h-[32px]"
                           >
                             Simpan
                           </Button>
@@ -1464,7 +1480,7 @@ export default function Admin() {
                             variant="ghost"
                             size="sm"
                             onClick={handleCancelEditReferensi}
-                            className="shrink-0"
+                            className="shrink-0 min-h-[32px]"
                           >
                             Batal
                           </Button>
@@ -1487,7 +1503,7 @@ export default function Admin() {
                             type="button"
                             onClick={() => handleStartEditReferensi(index)}
                             aria-label={`Ubah referensi ${url}`}
-                            className="shrink-0 rounded p-1 text-xs text-muted-foreground hover:bg-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+                            className="shrink-0 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine min-h-[32px]"
                           >
                             Ubah
                           </button>
@@ -1495,7 +1511,7 @@ export default function Admin() {
                             type="button"
                             onClick={() => handleRemoveReferensi(index)}
                             aria-label={`Hapus referensi ${url}`}
-                            className="shrink-0 rounded p-1 text-xs text-muted-foreground hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+                            className="shrink-0 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine min-h-[32px]"
                           >
                             Hapus
                           </button>

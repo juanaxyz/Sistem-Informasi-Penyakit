@@ -254,7 +254,7 @@ export function DiseaseDetailPage() {
                 <button
                   type="button"
                   onClick={() => setMobileTocOpen(false)}
-                  className="rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-ink"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label="Tutup daftar isi"
                 >
                   <X className="h-5 w-5" />

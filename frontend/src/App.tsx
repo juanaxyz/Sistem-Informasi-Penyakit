@@ -95,15 +95,17 @@ export default function App() {
         </Routes>
       </main>
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 flex justify-center">
-        <Dock
-          className="bg-background"
-          items={items}
-          panelHeight={60}
-          baseItemSize={48}
-          magnification={60}
-        />
-      </div>
+      {!location.pathname.startsWith("/admin") && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 flex justify-center">
+          <Dock
+            className="bg-background"
+            items={items}
+            panelHeight={60}
+            baseItemSize={48}
+            magnification={60}
+          />
+        </div>
+      )}
 
       <footer className="border-t border-border bg-muted/30 pt-4 pb-[max(5rem,env(safe-area-inset-bottom))] sm:py-4">
         <p className="max-w-7xl mx-auto px-4 text-center text-body-sm font-body text-muted-foreground">

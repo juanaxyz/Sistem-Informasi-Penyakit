@@ -58,6 +58,8 @@ export function ArtikelEditor({
   const [loadingPenyakit, setLoadingPenyakit] = useState(false);
   const [selectedTextPreview, setSelectedTextPreview] = useState<string>("");
 
+  const openTautkanPenyakitRef = useRef<() => Promise<void> | void>(() => {});
+
   const openTautkanPenyakit = async () => {
     const quill = quillRef.current;
     if (!quill) return;
@@ -85,7 +87,7 @@ export function ArtikelEditor({
             })),
           );
         } else {
-          const fallback = await api.searchDiseases("");
+          const fallback = await api.searchDiseases("").catch(() => ({ penyakit: [] }));
           setPenyakitList(
             fallback.penyakit.map((p) => ({
               id: p.id,
@@ -101,6 +103,7 @@ export function ArtikelEditor({
       }
     }
   };
+  openTautkanPenyakitRef.current = openTautkanPenyakit;
 
   const handleInsertPenyakitLink = (slug: string, namaPenyakit: string) => {
     const quill = quillRef.current;
@@ -254,6 +257,25 @@ export function ArtikelEditor({
 
     wrapper.addEventListener("paste", onPasteFile, true);
     wrapper.addEventListener("drop", onDropFile, true);
+
+    // Tambahkan tombol Tautkan Penyakit ke toolbar Quill agar ikut sticky
+    const toolbarEl = wrapper.querySelector(".ql-toolbar");
+    if (toolbarEl && !toolbarEl.querySelector(".ql-tautkan-penyakit")) {
+      const span = document.createElement("span");
+      span.className = "ql-formats";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ql-tautkan-penyakit text-pine hover:text-pine";
+      btn.title = "Tautkan Penyakit Terkait";
+      btn.setAttribute("aria-label", "Tautkan Penyakit Terkait");
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 15px; height: 15px; margin: auto; display: block;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        void openTautkanPenyakitRef.current?.();
+      });
+      span.appendChild(btn);
+      toolbarEl.appendChild(span);
+    }
 
     return () => {
       wrapper.removeEventListener("paste", onPasteFile, true);
