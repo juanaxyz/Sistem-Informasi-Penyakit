@@ -34,10 +34,20 @@ const SANITIZE_OPTIONS = {
   },
   allowedSchemes: ["http", "https", "mailto"],
   transformTags: {
-    a: (_tag, attribs) => ({
-      tagName: "a",
-      attribs: { ...attribs, target: "_blank", rel: "noopener noreferrer" },
-    }),
+    a: (_tag, attribs) => {
+      const isInternal =
+        attribs.href &&
+        (attribs.href.startsWith("/") || attribs.href.startsWith("#"));
+      return {
+        tagName: "a",
+        attribs: {
+          ...attribs,
+          ...(isInternal
+            ? {}
+            : { target: "_blank", rel: "noopener noreferrer" }),
+        },
+      };
+    },
   },
   exclusiveFilter: (frame) =>
     frame.tag === "img" && !isAllowedImageSrc(frame.attribs.src),

@@ -49,6 +49,81 @@ export function ArtikelEditor({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // State untuk modal tautkan penyakit terkait
+  const [showPenyakitModal, setShowPenyakitModal] = useState(false);
+  const [searchPenyakitQuery, setSearchPenyakitQuery] = useState("");
+  const [penyakitList, setPenyakitList] = useState<
+    Array<{ id: number; nama: string; slug: string; sistem_tubuh_nama?: string }>
+  >([]);
+  const [loadingPenyakit, setLoadingPenyakit] = useState(false);
+  const [selectedTextPreview, setSelectedTextPreview] = useState<string>("");
+
+  const openTautkanPenyakit = async () => {
+    const quill = quillRef.current;
+    if (!quill) return;
+
+    const range = quill.getSelection(true) ?? { index: quill.getLength(), length: 0 };
+    savedRangeRef.current = range;
+
+    const selectedText =
+      range.length > 0 ? quill.getText(range.index, range.length).trim() : "";
+    setSelectedTextPreview(selectedText);
+    setSearchPenyakitQuery("");
+    setShowPenyakitModal(true);
+
+    if (penyakitList.length === 0) {
+      setLoadingPenyakit(true);
+      try {
+        const res = await api.getAllPenyakit().catch(() => null);
+        if (res?.penyakit) {
+          setPenyakitList(
+            res.penyakit.map((p) => ({
+              id: p.id,
+              nama: p.nama,
+              slug: p.slug,
+              sistem_tubuh_nama: p.sistem_tubuh_nama,
+            })),
+          );
+        } else {
+          const fallback = await api.searchDiseases("");
+          setPenyakitList(
+            fallback.penyakit.map((p) => ({
+              id: p.id,
+              nama: p.nama,
+              slug: p.slug,
+            })),
+          );
+        }
+      } catch {
+        // Gagal memuat data master
+      } finally {
+        setLoadingPenyakit(false);
+      }
+    }
+  };
+
+  const handleInsertPenyakitLink = (slug: string, namaPenyakit: string) => {
+    const quill = quillRef.current;
+    if (!quill) return;
+
+    const range = savedRangeRef.current ?? { index: quill.getLength(), length: 0 };
+    const url = `/penyakit/${slug}`;
+
+    internalSetRef.current = true;
+    if (range.length > 0) {
+      // Ada teks yang diseleksi -> jadikan link
+      quill.formatText(range.index, range.length, "link", url, "user");
+      quill.setSelection(range.index + range.length, 0, "user");
+    } else {
+      // Tidak ada teks yang diseleksi -> sisipkan nama penyakit bertaut
+      quill.insertText(range.index, namaPenyakit, "link", url, "user");
+      quill.setSelection(range.index + namaPenyakit.length, 0, "user");
+    }
+    internalSetRef.current = false;
+    onChange(quill.root.innerHTML);
+    setShowPenyakitModal(false);
+  };
+
   /**
    * Upload satu file gambar lalu sisipkan <img src=url> di kursor.
    * Satu-satunya jalan masuk gambar ke editor (klik tombol, paste, drop).
@@ -209,8 +284,45 @@ export function ArtikelEditor({
     else quill.enable();
   }, [disabled]);
 
+  const filteredPenyakit = penyakitList.filter((p) => {
+    if (!searchPenyakitQuery.trim()) return true;
+    const q = searchPenyakitQuery.toLowerCase();
+    return (
+      p.nama.toLowerCase().includes(q) ||
+      p.slug.toLowerCase().includes(q) ||
+      (p.sistem_tubuh_nama && p.sistem_tubuh_nama.toLowerCase().includes(q))
+    );
+  });
+
   return (
-    <div className="w-full">
+    <div className="w-full space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          Tip: Blok teks lalu klik <strong>Tautkan Penyakit</strong> untuk membuat rujukan silang.
+        </span>
+        <button
+          type="button"
+          onClick={openTautkanPenyakit}
+          disabled={disabled}
+          className="inline-flex items-center gap-1.5 rounded-md border border-pine/30 bg-pine/10 px-2.5 py-1 text-xs font-medium text-pine hover:bg-pine/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine disabled:opacity-50 transition"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+          Tautkan Penyakit Terkait
+        </button>
+      </div>
+
       <div
         ref={wrapperRef}
         style={{ minHeight: "400px" }}
@@ -237,6 +349,105 @@ export function ArtikelEditor({
         <p role="alert" className="mt-2 text-xs text-red-600">
           {uploadError}
         </p>
+      )}
+
+      {/* Modal Sisipkan Link Penyakit Terkait */}
+      {showPenyakitModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={() => setShowPenyakitModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-border">
+              <div>
+                <h3 className="font-display text-base font-semibold text-ink">
+                  Tautkan Penyakit Terkait
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {selectedTextPreview ? (
+                    <>
+                      Teks terpilih:{" "}
+                      <span className="font-semibold text-ink">
+                        "{selectedTextPreview}"
+                      </span>
+                    </>
+                  ) : (
+                    "Pilih penyakit untuk disisipkan sebagai tautan rujukan"
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPenyakitModal(false)}
+                className="text-muted-foreground hover:text-ink text-sm p-1 rounded"
+                aria-label="Tutup"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="relative">
+              <input
+                type="text"
+                autoFocus
+                placeholder="Cari nama penyakit..."
+                value={searchPenyakitQuery}
+                onChange={(e) => setSearchPenyakitQuery(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+              />
+            </div>
+
+            <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
+              {loadingPenyakit ? (
+                <div className="py-6 text-center text-xs text-muted-foreground">
+                  Memuat daftar penyakit…
+                </div>
+              ) : filteredPenyakit.length === 0 ? (
+                <div className="py-6 text-center text-xs text-muted-foreground">
+                  Tidak ada penyakit ditemukan.
+                </div>
+              ) : (
+                filteredPenyakit.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleInsertPenyakitLink(p.slug, p.nama)}
+                    className="w-full flex items-center justify-between p-2.5 rounded-lg border border-transparent hover:border-pine/30 hover:bg-pine/5 text-left transition group"
+                  >
+                    <div>
+                      <div className="text-sm font-medium text-ink group-hover:text-pine">
+                        {p.nama}
+                      </div>
+                      <div className="text-[11px] font-mono text-muted-foreground">
+                        /penyakit/{p.slug}
+                      </div>
+                    </div>
+                    {p.sistem_tubuh_nama && (
+                      <span className="text-[10px] rounded bg-muted px-2 py-0.5 text-muted-foreground shrink-0">
+                        {p.sistem_tubuh_nama}
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setShowPenyakitModal(false)}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted transition"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

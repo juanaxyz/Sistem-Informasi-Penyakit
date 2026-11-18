@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { sanitizeArtikelHtml, type TocItem } from "@/lib/artikel";
 
 export type { TocItem };
@@ -18,6 +19,7 @@ type ArticleProseProps = {
  * supaya tampilan publik sama dengan di editor.
  */
 export function ArticleProse({ children, className, onTocChange }: ArticleProseProps) {
+  const navigate = useNavigate();
   const tocKeyRef = useRef("");
   const { html, toc } = sanitizeArtikelHtml(children ?? "");
   // Bandingkan kunci id agar onTocChange tidak memicu loop render.
@@ -30,10 +32,23 @@ export function ArticleProse({ children, className, onTocChange }: ArticleProseP
     }
   }, [tocKey, toc, onTocChange]);
 
+  const handleClick = (e: MouseEvent<HTMLDivElement>) => {
+    const target = (e.target as HTMLElement).closest("a");
+    if (!target) return;
+
+    const href = target.getAttribute("href");
+    // Cegah full page reload untuk tautan internal (misal /penyakit/:slug)
+    if (href && href.startsWith("/") && !href.startsWith("//")) {
+      e.preventDefault();
+      navigate(href);
+    }
+  };
+
   return (
     <div
       className={className ? `article-prose ${className}` : "article-prose"}
       dangerouslySetInnerHTML={{ __html: html }}
+      onClick={handleClick}
     />
   );
 }
