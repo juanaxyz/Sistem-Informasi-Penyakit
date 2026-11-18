@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ActionRecommendation } from "@/components/ActionRecommendation";
 import type { AnalysisTypeRecord, Prediction } from "@/lib/types";
 import {
   ArrowRight,
@@ -399,7 +400,11 @@ function AnalyzePage({
           <p className="mt-4 text-body-sm font-body text-muted-foreground">
             Analisis telah selesai. Hasil prediksi di bawah.
           </p>
-          
+
+          <div className="mt-4">
+            <ActionRecommendation predictions={predictions} />
+          </div>
+
           {predictions.length > 0 && (
             <div className="mt-6 space-y-4">
               <h3 className="text-h4 font-display text-ink">Hasil Prediksi Model AI</h3>

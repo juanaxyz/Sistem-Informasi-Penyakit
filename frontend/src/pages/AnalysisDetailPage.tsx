@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { api, resolveAssetUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ActionRecommendation } from "@/components/ActionRecommendation";
 
 export default function AnalysisDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -86,6 +87,9 @@ export default function AnalysisDetailPage() {
         {/* Hasil Prediksi */}
         <div className="space-y-4">
           <h2 className="text-h2 font-display text-ink">Hasil Prediksi Model AI</h2>
+          {riwayat.predictions && riwayat.predictions.length > 0 && (
+            <ActionRecommendation predictions={riwayat.predictions} />
+          )}
           {riwayat.predictions && riwayat.predictions.length > 0 ? (
             <div className="space-y-4">
               <div className="overflow-x-auto">
