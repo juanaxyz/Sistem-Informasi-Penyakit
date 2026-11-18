@@ -184,7 +184,8 @@ export interface ArtikelSummary {
   status?: string;
   /** Field legacy; artikel baru tidak lagi punya judul terpisah. */
   judul?: string | null;
-  konten?: string;
+  /** Cuplikan teks polos (maks 140 karakter) dari `artikel.konten_teks`. */
+  ringkasan?: string;
   penyakit_nama: string;
 }
 

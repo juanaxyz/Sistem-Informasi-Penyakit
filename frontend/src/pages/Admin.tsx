@@ -1255,22 +1255,19 @@ export default function Admin() {
                     onClick={() => handleSelectArtikel(a)}
                     className="flex items-center justify-between p-3.5 rounded-lg border border-border/60 hover:border-pine/40 hover:bg-muted/30 cursor-pointer transition"
                   >
-                    <div>
+                    <div className="min-w-0 flex-1 pr-4">
                       <h4 className="font-medium text-ink text-sm">
                         {a.penyakit_nama}
                       </h4>
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                        {a.konten
-                          ? a.konten.replace(/<[^>]*>/g, "").substring(0, 90)
-                          : "Belum ada konten"}
-                        ...
+                        {a.ringkasan?.trim() || "Belum ada konten"}
                       </p>
                     </div>
                     <Badge
                       variant={
                         a.status === "terbit" ? "secondary" : "outline"
                       }
-                      className="text-xs"
+                      className="text-xs shrink-0"
                     >
                       {a.status === "terbit" ? "Terbit" : "Draft"}
                     </Badge>

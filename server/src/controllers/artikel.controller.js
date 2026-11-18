@@ -76,7 +76,18 @@ const triggerReembed = (idArtikel) => {
 const handleGetArtikelList = async (_req, res) => {
   const { rows } = await query(
     `SELECT a.id, a.id_penyakit, p.nama AS penyakit_nama, a.status,
-            a.diperbarui_pada
+            a.diperbarui_pada,
+            LEFT(
+              BTRIM(
+                COALESCE(
+                  NULLIF(BTRIM(a.konten_teks), ''),
+                  -- Baris legacy yang belum di-backfill belum punya konten_teks;
+                  -- strip tag sebagai jaring pengaman agar card tidak kosong.
+                  regexp_replace(COALESCE(a.konten, ''), '<[^>]+>', ' ', 'g')
+                )
+              ),
+              140
+            ) AS ringkasan
      FROM artikel a
      JOIN penyakit p ON p.id = a.id_penyakit
      ORDER BY a.id_penyakit, a.id`,
@@ -87,6 +98,9 @@ const handleGetArtikelList = async (_req, res) => {
     status: a.status,
     penyakit_nama: a.penyakit_nama ?? "",
     diperbarui_pada: a.diperbarui_pada,
+    // Cuplikan teks polos untuk kartu daftar; HTML penuh hanya lewat
+    // GET /artikel/:idPenyakit agar payload daftar tetap ringan.
+    ringkasan: a.ringkasan ?? "",
   }));
   res.json({ artikel: artikelList });
 };
