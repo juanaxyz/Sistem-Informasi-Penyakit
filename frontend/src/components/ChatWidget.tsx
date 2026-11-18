@@ -105,12 +105,12 @@ export function ChatWidget() {
         aria-expanded={open}
         aria-controls="chat-widget-panel"
         aria-label={open ? "Tutup chat" : "Buka chat"}
-        className="fixed cursor-pointer bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="fixed cursor-pointer bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] sm:bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-50 flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {open ? (
-          <X className="h-6 w-6" aria-hidden="true" />
+          <X className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
         ) : (
-          <MessageCircle className="h-6 w-6" aria-hidden="true" />
+          <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
         )}
       </button>
 
@@ -120,7 +120,7 @@ export function ChatWidget() {
           role="dialog"
           aria-modal="false"
           aria-label="Chat asisten kesehatan"
-          className="fixed bottom-[max(5rem,env(safe-area-inset-bottom))] right-4 z-50 flex h-[min(28rem,calc(100dvh-6.5rem))] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden rounded-lg border border-border bg-card shadow-xl"
+          className="fixed bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] sm:bottom-[max(5rem,env(safe-area-inset-bottom))] right-4 z-50 flex h-[min(28rem,calc(100dvh-8rem))] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
         >
           <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-4 py-3">
             <div className="flex items-center gap-2">

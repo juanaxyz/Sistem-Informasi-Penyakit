@@ -237,7 +237,7 @@ export const BodyMap = ({
               transition={{ duration: 0.15 }}
               className="block max-w-[calc(100vw-3rem)] truncate rounded-full border border-border bg-background px-3 py-0.5 font-mono text-xs text-ink shadow-sm"
             >
-              <span className="mr-1.5  w-1.5 h-1.5 rounded-full bg-pine align-middle " />
+              <span className="mr-1.5 inline-block w-1.5 h-1.5 rounded-full bg-pine align-middle" />
               {activeLabel}
             </motion.div>
           ) : null}

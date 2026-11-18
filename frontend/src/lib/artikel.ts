@@ -65,7 +65,14 @@ const sanitize = {
     if (typeof window === "undefined" || !raw) return raw ?? "";
     const doc = new DOMParser().parseFromString(raw, "text/html");
     const used = new Set<string>();
-    doc.querySelectorAll("h1, h2, h3").forEach((el) => {
+    // Artikel memakai h2/h3; h1 sisa editor diturunkan menjadi h2 supaya
+    // hierarki halaman (judul penyakit = satu-satunya h1) tetap sehat.
+    doc.querySelectorAll("h1").forEach((el) => {
+      const h2 = doc.createElement("h2");
+      h2.innerHTML = el.innerHTML;
+      el.replaceWith(h2);
+    });
+    doc.querySelectorAll("h2, h3").forEach((el) => {
       const id = uniqueAnchor(slugifyAnchor(el.textContent ?? ""), used);
       el.id = id;
     });

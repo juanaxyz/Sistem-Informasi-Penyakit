@@ -10,7 +10,16 @@ import { BodyPartPreview } from "@/components/BodyPartPreview";
 import { MedicalDisclaimer } from "@/components/MedicalDisclaimer";
 import { ArticleProse, TableOfContents, type TocItem } from "@/components/ArticleProse";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronRight, List as ListIcon, X } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  Clock,
+  Copy,
+  FileText,
+  List as ListIcon,
+  Printer,
+  X,
+} from "lucide-react";
 
 /** Judul section artikel yang konsisten: display font + aksen bar pine di kiri. */
 function ArticleHeading({
@@ -112,8 +121,32 @@ export function DiseaseDetailPage() {
   const [mobileTocOpen, setMobileTocOpen] = useState(false);
   /** Daftar isi otomatis dari <h2>/<h3> di konten HTML artikel. */
   const [tocItems, setTocItems] = useState<TocItem[]>([]);
+  const [copied, setCopied] = useState(false);
 
   const { data, isLoading, error } = useDiseaseDetail(validSlug);
+
+  const handleCopyLink = () => {
+    void navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const readingTimeMinutes = (() => {
+    if (!data) return 1;
+    const artikelList = Array.isArray(data.artikel)
+      ? data.artikel
+      : data.artikel
+        ? [data.artikel]
+        : [];
+    const textContent = artikelList
+      .map((a) => a.konten?.replace(/<[^>]+>/g, " ") || "")
+      .join(" ");
+    const wordCount = (textContent + " " + (data.ringkasan || ""))
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length;
+    return Math.max(1, Math.ceil(wordCount / 200));
+  })();
 
   useEffect(() => {
     document.title = data ? `${data.nama} — Peta Kesehatan` : "Peta Kesehatan";
@@ -195,12 +228,37 @@ export function DiseaseDetailPage() {
   return (
     <div className="space-y-4">
       <ReadingProgress />
-      <div className="flex items-center justify-between gap-2">
+
+      {/* Breadcrumb navigasi */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
+        <Link to="/" className="hover:text-ink transition">
+          Beranda
+        </Link>
+        <ChevronRight className="h-3 w-3 shrink-0" />
+        <Link to="/body-map" className="hover:text-ink transition">
+          Peta Tubuh
+        </Link>
+        {data.sistem_tubuh && (
+          <>
+            <ChevronRight className="h-3 w-3 shrink-0" />
+            <span className="truncate max-w-[120px] sm:max-w-none">
+              {data.sistem_tubuh.nama}
+            </span>
+          </>
+        )}
+        <ChevronRight className="h-3 w-3 shrink-0" />
+        <span className="font-medium text-ink truncate max-w-[150px] sm:max-w-none">
+          {data.nama}
+        </span>
+      </nav>
+
+      {/* Top action bar: Kembali + Share + Print + Mobile TOC */}
+      <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-3">
         <Button
           variant="ghost"
           size="sm"
           onClick={handleBack}
-          className="gap-1 px-2"
+          className="gap-1 px-2 h-8 text-xs font-medium"
         >
           <svg
             className="h-4 w-4"
@@ -216,20 +274,49 @@ export function DiseaseDetailPage() {
               d="M15 19l-7-7 7-7"
             />
           </svg>
-          <span className="font-medium">Kembali</span>
+          <span>Kembali</span>
         </Button>
-        {tocItems.length > 0 && (
+
+        <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
             size="sm"
-            className="lg:hidden gap-1"
-            onClick={() => setMobileTocOpen(true)}
+            onClick={handleCopyLink}
+            className="h-8 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-ink"
+            title="Salin tautan artikel"
           >
-            <ListIcon className="h-4 w-4" />
-            <span>Daftar Isi</span>
-            <ChevronRight className="h-4 w-4" />
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-pine" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+            <span>{copied ? "Tersalin!" : "Salin Link"}</span>
           </Button>
-        )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.print()}
+            className="h-8 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-ink hidden sm:inline-flex"
+            title="Cetak ringkasan halaman"
+          >
+            <Printer className="h-3.5 w-3.5" />
+            <span>Cetak</span>
+          </Button>
+
+          {tocItems.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="lg:hidden h-8 gap-1 text-xs"
+              onClick={() => setMobileTocOpen(true)}
+            >
+              <ListIcon className="h-3.5 w-3.5" />
+              <span>Daftar Isi</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <AnimatePresence>
@@ -281,6 +368,17 @@ export function DiseaseDetailPage() {
               <h1 className="mt-4 text-h1 font-display text-ink tracking-tight text-balance">
                 {data.nama}
               </h1>
+
+              {/* Reading metadata */}
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-pine" />
+                  <span>{readingTimeMinutes} menit baca</span>
+                </span>
+                <span aria-hidden="true" className="text-border">·</span>
+                <span className="text-pine font-medium">Informasi Medis Terverifikasi</span>
+              </div>
+
               {data.ringkasan && (
                 <p className="mt-3 max-w-2xl text-body font-body leading-relaxed text-muted-foreground text-pretty">
                   {data.ringkasan}
@@ -323,13 +421,28 @@ export function DiseaseDetailPage() {
                 ))}
               </div>
             ) : (
-              <div className="mt-8 rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
-                <p className="text-sm font-medium text-ink">
-                  Belum ada artikel untuk penyakit ini
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Konten edukasi akan tersedia setelah diterbitkan oleh admin.
-                </p>
+              <div className="mt-8 rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center space-y-4">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-pine/10 text-pine">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-ink">
+                    Artikel Edukasi Sedang Dipersiapkan
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto">
+                    Konten mendalam untuk {data.nama} sedang dalam tahap peninjauan. Anda dapat menanyakan ringkasan awal langsung ke Asisten AI melalui tombol chat di bawah.
+                  </p>
+                </div>
+                {data.bagian_tubuh.length > 0 && (
+                  <div className="pt-2">
+                    <Link
+                      to="/body-map"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted transition"
+                    >
+                      Eksplorasi Bagian Tubuh Lainnya →
+                    </Link>
+                  </div>
+                )}
               </div>
             );
           })()}
