@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDiseaseDetail } from "@/hooks/useDiseaseDetail";
+import { isEmptyKonten } from "@/lib/artikel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { BodyPartPreview } from "@/components/BodyPartPreview";
 import { MedicalDisclaimer } from "@/components/MedicalDisclaimer";
-import { ArticleProse, TableOfContents } from "@/components/ArticleProse";
+import { ArticleProse, TableOfContents, type TocItem } from "@/components/ArticleProse";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronRight, List as ListIcon, X } from "lucide-react";
 
@@ -109,6 +110,8 @@ export function DiseaseDetailPage() {
   const validSlug = slug && slug.trim() ? slug.trim() : null;
   const navigate = useNavigate();
   const [mobileTocOpen, setMobileTocOpen] = useState(false);
+  /** Daftar isi otomatis dari <h2>/<h3> di konten HTML artikel. */
+  const [tocItems, setTocItems] = useState<TocItem[]>([]);
 
   const { data, isLoading, error } = useDiseaseDetail(validSlug);
 
@@ -126,20 +129,6 @@ export function DiseaseDetailPage() {
       navigate("/");
     }
   };
-
-  const tocItems = useMemo(() => {
-    if (!data) return [];
-    const items: { id: string; text: string; level: number }[] = [];
-    data.artikel.forEach((article) => {
-      article.bagian?.forEach((sec) => {
-        if (sec.judul) {
-          const anchorId = `bagian-${sec.id ?? sec.urutan}`;
-          items.push({ id: anchorId, text: sec.judul, level: 2 });
-        }
-      });
-    });
-    return items;
-  }, [data]);
 
   if (isLoading) {
     return (
@@ -315,33 +304,25 @@ export function DiseaseDetailPage() {
                 </div>
               )}
             </header>
-          {data.artikel.length > 0 && (
+          {data.artikel.length > 0 ? (
             <div className="mt-6 space-y-8">
               {data.artikel.map((article) =>
-                article.bagian && article.bagian.length > 0 ? (
-                  <div key={article.id} className="space-y-8">
-                    {article.bagian.map((sec) => {
-                      const anchorId = `bagian-${sec.id ?? sec.urutan}`;
-                      return (
-                        <section key={anchorId} id={anchorId} className="scroll-mt-24 space-y-3">
-                          {sec.judul && (
-                            <ArticleHeading id={anchorId} anchorable>
-                              {sec.judul}
-                            </ArticleHeading>
-                          )}
-                          {/*
-                            `ArticleProse` memegang seluruh styling heading, list,
-                            blockquote, tabel, dan kode. Jangan pakai kelas
-                            `prose` di sini: plugin typography tidak terpasang,
-                            jadi kelas itu tidak melakukan apa pun.
-                          */}
-                          <ArticleProse>{sec.konten}</ArticleProse>
-                        </section>
-                      );
-                    })}
-                  </div>
+                // Artikel tanpa konten tidak ditampilkan; empty state ada di bawah.
+                !isEmptyKonten(article.konten) ? (
+                  <ArticleProse key={article.id} onTocChange={setTocItems}>
+                    {article.konten}
+                  </ArticleProse>
                 ) : null,
               )}
+            </div>
+          ) : (
+            <div className="mt-8 rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
+              <p className="text-sm font-medium text-ink">
+                Belum ada artikel untuk penyakit ini
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Konten edukasi akan tersedia setelah diterbitkan oleh admin.
+              </p>
             </div>
           )}
           {data.bagian_tubuh.length > 0 && (

@@ -57,11 +57,19 @@ export interface Patogen {
   penyakit?: Disease[];
 }
 
+/**
+ * Satu artikel per penyakit (Opsi A): konten tunggal HTML hasil editor Quill
+ * yang sudah disanitasi backend.
+ */
+export type ArtikelStatus = "draft" | "terbit";
+
 export interface Artikel {
   id: number;
-  status?: string;
+  id_penyakit: number;
+  status: string;
+  konten: string;
   ditinjau_pada?: string | null;
-  bagian: ArtikelBagian[];
+  diperbarui_pada?: string | null;
 }
 
 /** Detail lengkap satu penyakit (halaman detail). */
@@ -131,15 +139,25 @@ export interface LoginPayload {
   password: string;
 }
 
-export interface ArtikelBagian {
-  id?: number;
-  id_artikel?: number;
-  tipe?: string;
-  judul: string | null;
+/** Respons GET /api/artikel/:id_penyakit (sama dengan Artikel). */
+export type ArtikelDetail = Artikel;
+
+/** Respons PUT /api/artikel/:id_penyakit — konten versi tersanitasi backend. */
+export interface ArtikelSaveResponse {
+  id: number;
   konten: string;
-  urutan?: number;
-  dibuat_pada?: string;
-  diperbarui_pada?: string;
+  diperbarui_pada: string;
+}
+
+/** Respons POST /api/artikel/upload-gambar. */
+export interface ArtikelUploadResponse {
+  url: string;
+}
+
+/** Payload PUT /api/artikel/:id_penyakit. */
+export interface ArtikelPayload {
+  konten: string;
+  status: ArtikelStatus;
 }
 
 export interface PenyakitFormPayload {
@@ -159,14 +177,15 @@ export interface PenyakitFormPayload {
   referensi?: string[];
 }
 
-/** Daftar artikel ringkas untuk panel admin (drop-down daftar artikel). */
+/** Daftar artikel ringkas untuk panel admin. */
 export interface ArtikelSummary {
   id: number;
   id_penyakit: number;
-  judul: string;
-  konten: string;
+  status?: string;
+  /** Field legacy; artikel baru tidak lagi punya judul terpisah. */
+  judul?: string | null;
+  konten?: string;
   penyakit_nama: string;
-  firstBagianId?: number | null;
 }
 
 export type RiwayatStatus = "processing" | "completed" | "failed";

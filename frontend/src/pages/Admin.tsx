@@ -5,14 +5,16 @@ import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
-import { ArticleProse } from "@/components/ArticleProse";
 import Dashboard from "./AdminDashboard";
 import { BodyMap } from "@/components/bodyMap/BodyMap";
+import { ArtikelEditor } from "@/components/ArtikelEditor";
+import { isEmptyKonten, MAKS_KONTEN } from "@/lib/artikel";
 import type {
   UrgencyLevel,
   BodyPartRecord,
   SystemRecord,
-  ArtikelBagian,
+  ArtikelStatus,
+  ArtikelSummary,
   Patogen,
 } from "@/lib/types";
 
@@ -29,46 +31,12 @@ interface PenyakitListItem {
   code?: string | null;
 }
 
-interface ArtikelListItem {
-  id: number;
-  /** Wajib: BFF selalu menyertakannya di daftar dan respons pembuatan artikel. */
-  id_penyakit: number;
-  judul: string;
-  konten: string;
-  penyakit_nama: string;
-}
-
-/** Tombol kecil di toolbar formatting Markdown. */
-function ToolbarButton({
-  label,
-  title,
-  onClick,
-  children,
-}: {
-  label: string;
-  title: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-label={label}
-      className="flex h-6 min-w-6 items-center justify-center rounded px-1.5 text-ink transition hover:bg-pine/10 hover:text-pine focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
-    >
-      {children}
-    </button>
-  );
-}
-
 export default function Admin() {
   const { user } = useAuth();
 
   // Lists data
   const [penyakitList, setPenyakitList] = useState<PenyakitListItem[]>([]);
-  const [artikelList, setArtikelList] = useState<ArtikelListItem[]>([]);
+  const [artikelList, setArtikelList] = useState<ArtikelSummary[]>([]);
   const [sistemTubuhList, setSistemTubuhList] = useState<SystemRecord[]>([]);
   const [bodyPartList, setBodyPartList] = useState<BodyPartRecord[]>([]);
   const [patogenList, setPatogenList] = useState<Patogen[]>([]);
@@ -80,7 +48,20 @@ export default function Admin() {
   const [selectedPenyakit, setSelectedPenyakit] =
     useState<PenyakitListItem | null>(null);
   const [selectedArtikel, setSelectedArtikel] =
-    useState<ArtikelListItem | null>(null);
+    useState<ArtikelSummary | null>(null);
+
+  // Artikel (satu editor Quill per artikel): konten HTML + status.
+  // `artikelSaved` = snapshot tersimpan -> dipakai mendeteksi perubahan belum
+  // tersimpan dan menonaktifkan tombol Simpan.
+  const [artikelKonten, setArtikelKonten] = useState("");
+  const [artikelStatus, setArtikelStatus] = useState<ArtikelStatus>("draft");
+  const [artikelSaved, setArtikelSaved] = useState<{
+    konten: string;
+    status: ArtikelStatus;
+  }>({ konten: "", status: "draft" });
+  const [artikelSaving, setArtikelSaving] = useState(false);
+  /** Error validasi (422) / penyimpanan — ditampilkan di bawah editor. */
+  const [artikelError, setArtikelError] = useState<string | null>(null);
 
   // Patogen editor modal state
   const [showPatogenModal, setShowPatogenModal] = useState(false);
@@ -124,8 +105,7 @@ export default function Admin() {
     patogenIds: [],
   });
 
-  // Artikel Multi-Bagian State
-  const [bagianList, setBagianList] = useState<ArtikelBagian[]>([]);
+  // Artikel Multi-Bagian State — diganti satu editor Quill (lihat atas).
 
   // Referensi (URL sumber) — hanya muncul di editor artikel. `referensiSaved`
   // dipakai untuk menandai daftar yang belum tersimpan (dirty state).
@@ -140,9 +120,13 @@ export default function Admin() {
     referensiList.length !== referensiSaved.length ||
     referensiList.some((url, i) => url !== referensiSaved[i]);
 
-  // Editor Markdown: pratinjau per bagian + akses ke textarea untuk toolbar.
-  const [previewBagian, setPreviewBagian] = useState<number | null>(null);
-  const bagianRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
+  /** Ada perubahan artikel yang belum tersimpan. */
+  const artikelDirty =
+    artikelKonten !== artikelSaved.konten ||
+    artikelStatus !== artikelSaved.status;
+
+  const artikelEmpty = isEmptyKonten(artikelKonten);
+  const artikelTooLarge = artikelKonten.length > MAKS_KONTEN;
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -250,6 +234,36 @@ export default function Admin() {
       dialog.close();
     }
   }, [showPatogenModal]);
+
+  // Peringatan saat meninggalkan halaman dengan perubahan artikel belum tersimpan.
+  useEffect(() => {
+    if (!artikelDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [artikelDirty]);
+
+  /** Keluar dari editor artikel dengan konfirmasi bila ada perubahan. */
+  const keluarArtikel = (mode: "penyakit" | "artikel" | "patogen" | null) => {
+    if (
+      artikelDirty &&
+      !window.confirm(
+        "Perubahan artikel belum disimpan. Yakin ingin meninggalkan editor?",
+      )
+    )
+      return;
+    setSelectedArtikel(null);
+    setArtikelKonten("");
+    setArtikelStatus("draft");
+    setArtikelSaved({ konten: "", status: "draft" });
+    setArtikelError(null);
+    setEditMode(mode);
+    setError(null);
+    setSuccess(null);
+  };
 
   // --- HANDLER PENYAKIT ---
   const handleNewPenyakit = () => {
@@ -503,34 +517,33 @@ export default function Admin() {
     }
   };
 
-  // --- HANDLER ARTIKEL (MULTI-BAGIAN) ---
-  const handleSelectArtikel = async (artikel: ArtikelListItem) => {
+  // --- HANDLER ARTIKEL (SATU EDITOR QUILL) ---
+  const handleSelectArtikel = async (artikel: ArtikelSummary) => {
     setSelectedArtikel(artikel);
     setEditMode("artikel");
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setArtikelError(null);
     try {
-      const res = await api.getArtikelBagian(artikel.id);
-      if (res.bagian && res.bagian.length > 0) {
-        setBagianList(res.bagian);
-      } else {
-        // Inisialisasi 1 bagian kosong jika artikel belum punya bagian
-        setBagianList([
-          {
-            id_artikel: artikel.id,
-            judul: "Pengertian & Ringkasan",
-            konten: "",
-            tipe: "ringkasan",
-            urutan: 1,
-          },
-        ]);
-      }
+      const res = await api.getArtikel(artikel.id_penyakit);
+      const status = (res.status as ArtikelStatus) ?? "draft";
+      const konten = res.konten ?? "";
+      setArtikelKonten(konten);
+      setArtikelStatus(status);
+      setArtikelSaved({ konten, status });
       // Referensi ikut ditampilkan di editor artikel.
       void loadReferensi(artikel.id_penyakit);
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError("Gagal memuat bagian artikel");
+      if (err instanceof ApiError) {
+        if (err.status === 401 || err.status === 403) {
+          setError("Sesi habis atau Anda tidak memiliki izin (admin only).");
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("Gagal memuat artikel");
+      }
     } finally {
       setLoading(false);
     }
@@ -669,17 +682,12 @@ export default function Admin() {
       setArtikelList(artikelRes.artikel || []);
       closeArtikelModal();
       // Langsung masuk editor artikel baru
-      setSelectedArtikel(artikel as ArtikelListItem);
+      setSelectedArtikel(artikel as ArtikelSummary);
       setEditMode("artikel");
-      setBagianList([
-        {
-          id_artikel: artikel.id,
-          judul: "Pengertian & Ringkasan",
-          konten: "",
-          tipe: "ringkasan",
-          urutan: 1,
-        },
-      ]);
+      setArtikelKonten("");
+      setArtikelStatus("draft");
+      setArtikelSaved({ konten: "", status: "draft" });
+      setArtikelError(null);
       // Referensi ikut ditampilkan di editor artikel.
       void loadReferensi(artikel.id_penyakit);
     } catch (err) {
@@ -690,115 +698,53 @@ export default function Admin() {
     }
   };
 
-  const handleAddBagian = () => {
-    setBagianList((prev) => [
-      ...prev,
-      {
-        id_artikel: selectedArtikel?.id,
-        judul: "",
-        konten: "",
-        tipe: "lainnya",
-        urutan: prev.length + 1,
-      },
-    ]);
-  };
-
-  const handleRemoveBagian = (index: number) => {
-    setBagianList((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const handleBagianChange = (
-    index: number,
-    field: keyof ArtikelBagian,
-    value: string,
-  ) => {
-    setBagianList((prev) => {
-      const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
-      return next;
-    });
-  };
-
   /**
-   * Terapkan pembungkus Markdown (mis. `**tebal**`) pada pilihan kursor.
-   * Kalau tidak ada teks yang dipilih, sisipkan `placeholder` sebagai contoh
-   * supaya admin langsung tahu formatnya.
+   * Simpan artikel: PUT /api/artikel/:id_penyakit dengan konten HTML dari
+   * Quill + status. Setelah sukses, editor diganti dengan `konten` versi
+   * tersanitasi dari respons backend (backend sumber kebenaran).
    */
-  const applyMarkdownWrap = (
-    index: number,
-    before: string,
-    after: string,
-    placeholder: string,
-  ) => {
-    const el = bagianRefs.current[index];
-    if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const current = bagianList[index]?.konten ?? "";
-    const selected = current.slice(start, end) || placeholder;
-    const next =
-      current.slice(0, start) + before + selected + after + current.slice(end);
-    handleBagianChange(index, "konten", next);
-    requestAnimationFrame(() => {
-      el.focus();
-      // Kursor ditaruh di dalam placeholder agar mudah diketik setelahnya.
-      const caret = start + before.length;
-      el.setSelectionRange(caret, caret + selected.length);
-    });
-  };
-
-  /**
-   * Terapkan awalan baris (mis. `## ` atau `- `) ke setiap baris yang sedang
-   * dipilih. Kalau tidak ada pilihan, sisipkan satu baris baru di akhir konten.
-   */
-  const applyMarkdownLine = (index: number, prefix: string) => {
-    const el = bagianRefs.current[index];
-    if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const current = bagianList[index]?.konten ?? "";
-    const next =
-      end > start
-        ? current
-            .slice(0, start)
-            .split("\n")
-            .map((line) => prefix + line)
-            .join("\n") + current.slice(end)
-        : `${current}${current.length > 0 ? "\n" : ""}${prefix}`;
-    handleBagianChange(index, "konten", next);
-    requestAnimationFrame(() => {
-      el.focus();
-      const caret = next.length;
-      el.setSelectionRange(caret, caret);
-    });
-  };
-
   const handleSaveArtikel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedArtikel) return;
 
-    setLoading(true);
+    setArtikelSaving(true);
+    setArtikelError(null);
     setError(null);
     setSuccess(null);
     try {
-      // Siapkan payload dengan urutan terbaru
-      const payload = bagianList.map((b, idx) => ({
-        ...b,
-        urutan: idx + 1,
-      }));
-      await api.saveArtikelBagian(selectedArtikel.id, payload);
-      setSuccess("Konten artikel berhasil disimpan");
+      const res = await api.updateArtikel(selectedArtikel.id_penyakit, {
+        konten: artikelKonten,
+        status: artikelStatus,
+      });
+      // Ganti isi editor dengan hasil sanitasi backend.
+      setArtikelKonten(res.konten);
+      setArtikelSaved({ konten: res.konten, status: artikelStatus });
+      setSuccess("Artikel berhasil disimpan");
 
       // Refresh artikel list
-      const res = await api.getArtikelList();
-      setArtikelList(res.artikel || []);
-      setSelectedArtikel(null);
-      setEditMode(null);
+      const listRes = await api.getArtikelList();
+      setArtikelList(listRes.artikel || []);
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError("Gagal menyimpan artikel");
+      if (err instanceof ApiError) {
+        if (err.status === 422) {
+          // { error, field } — pesan ditampilkan di bawah editor.
+          setArtikelError(err.message);
+        } else if (err.status === 401 || err.status === 403) {
+          setError(
+            err.status === 401
+              ? "Sesi habis. Silakan login kembali."
+              : "Anda tidak memiliki izin untuk menyimpan artikel (admin only).",
+          );
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError(
+          "Gagal menyimpan artikel. Periksa koneksi internet lalu coba lagi.",
+        );
+      }
     } finally {
-      setLoading(false);
+      setArtikelSaving(false);
     }
   };
 
@@ -832,13 +778,7 @@ export default function Admin() {
               variant={editMode === null ? "secondary" : "ghost"}
               size="sm"
               className="justify-start font-medium  "
-              onClick={() => {
-                setEditMode(null);
-                setSelectedPenyakit(null);
-                setSelectedArtikel(null);
-                setError(null);
-                setSuccess(null);
-              }}
+              onClick={() => keluarArtikel(null)}
             >
               Ringkasan
             </Button>
@@ -846,12 +786,7 @@ export default function Admin() {
               variant={editMode === "penyakit" ? "secondary" : "ghost"}
               size="sm"
               className="justify-start font-medium"
-              onClick={() => {
-                setEditMode("penyakit");
-                setSelectedPenyakit(null);
-                setError(null);
-                setSuccess(null);
-              }}
+              onClick={() => keluarArtikel("penyakit")}
             >
               Katalog Penyakit
             </Button>
@@ -859,12 +794,7 @@ export default function Admin() {
               variant={editMode === "artikel" ? "secondary" : "ghost"}
               size="sm"
               className="justify-start font-medium"
-              onClick={() => {
-                setEditMode("artikel");
-                setSelectedArtikel(null);
-                setError(null);
-                setSuccess(null);
-              }}
+              onClick={() => keluarArtikel("artikel")}
             >
               Edukasi & Artikel
             </Button>
@@ -872,11 +802,7 @@ export default function Admin() {
               variant={editMode === "patogen" ? "secondary" : "ghost"}
               size="sm"
               className="justify-start font-medium"
-              onClick={() => {
-                setEditMode("patogen");
-                setError(null);
-                setSuccess(null);
-              }}
+              onClick={() => keluarArtikel("patogen")}
             >
               Daftar Patogen
             </Button>
@@ -1334,15 +1260,19 @@ export default function Admin() {
                         {a.penyakit_nama}
                       </h4>
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                        {a.judul ? `${a.judul} — ` : ""}
                         {a.konten
-                          ? a.konten.substring(0, 90)
+                          ? a.konten.replace(/<[^>]*>/g, "").substring(0, 90)
                           : "Belum ada konten"}
                         ...
                       </p>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      Kelola Bagian
+                    <Badge
+                      variant={
+                        a.status === "terbit" ? "secondary" : "outline"
+                      }
+                      className="text-xs"
+                    >
+                      {a.status === "terbit" ? "Terbit" : "Draft"}
                     </Badge>
                   </div>
                 ))}
@@ -1358,208 +1288,77 @@ export default function Admin() {
                     Edit Artikel: {selectedArtikel.penyakit_nama}
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Atur judul dan isi konten per bagian/seksi
+                    Tulis seluruh isi artikel dalam satu editor. Gunakan
+                    subjudul <strong>H2</strong> untuk bagian (Gejala,
+                    Penyebab, dst.) dan <strong>H3</strong> untuk sub-bagian.
                   </p>
                 </div>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    setSelectedArtikel(null);
-                    setEditMode("artikel");
-                  }}
+                  onClick={() => keluarArtikel("artikel")}
                 >
                   Batal
                 </Button>
               </div>
 
               <div className="space-y-4">
-                {bagianList.map((b, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-lg border border-border bg-background/50 space-y-3"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-mono font-semibold text-pine bg-pine/10 px-2 py-0.5 rounded">
-                        Bagian #{idx + 1}
-                      </span>
-                      {bagianList.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveBagian(idx)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 text-xs px-2"
-                        >
-                          Hapus Bagian
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="grid sm:grid-cols-3 gap-3">
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-medium text-muted-foreground mb-1">
-                          Judul Bagian
-                        </label>
-                        <input
-                          type="text"
-                          value={b.judul || ""}
-                          onChange={(e) =>
-                            handleBagianChange(idx, "judul", e.target.value)
-                          }
-                          placeholder="Contoh: Gejala Klinis, Pencegahan, dsb."
-                          className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-muted-foreground mb-1">
-                          Tipe Bagian
-                        </label>
-                        <select
-                          value={b.tipe || "lainnya"}
-                          onChange={(e) =>
-                            handleBagianChange(idx, "tipe", e.target.value)
-                          }
-                          className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
-                        >
-                          <option value="ringkasan">Ringkasan</option>
-                          <option value="gejala">Gejala</option>
-                          <option value="penyebab">Penyebab</option>
-                          <option value="diagnosis">Diagnosis</option>
-                          <option value="penanganan">Penanganan</option>
-                          <option value="pencegahan">Pencegahan</option>
-                          <option value="kapan_ke_dokter">
-                            Kapan ke Dokter
-                          </option>
-                          <option value="lainnya">Lainnya</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <label className="block text-xs font-medium text-muted-foreground">
-                          Konten Markdown
-                        </label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            setPreviewBagian((prev) =>
-                              prev === idx ? null : idx,
-                            )
-                          }
-                          aria-pressed={previewBagian === idx}
-                          className="h-6 px-2 text-[11px] text-muted-foreground hover:text-pine"
-                        >
-                          {previewBagian === idx
-                            ? "Sembunyikan pratinjau"
-                            : "Pratinjau"}
-                        </Button>
-                      </div>
-
-                      {/* Toolbar formatting: admins tidak perlu menghafal sintaks. */}
-                      <div className="mb-1.5 flex flex-wrap items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1">
-                        <ToolbarButton
-                          label="Tebal"
-                          title="Tebal (Ctrl+B)"
-                          onClick={() =>
-                            applyMarkdownWrap(idx, "**", "**", "teks tebal")
-                          }
-                        >
-                          <span className="font-bold text-xs">B</span>
-                        </ToolbarButton>
-                        <ToolbarButton
-                          label="Miring"
-                          title="Miring (Ctrl+I)"
-                          onClick={() =>
-                            applyMarkdownWrap(idx, "_", "_", "teks miring")
-                          }
-                        >
-                          <span className="italic font-serif text-xs">I</span>
-                        </ToolbarButton>
-                        <ToolbarButton
-                          label="Subjudul"
-                          title="Subjudul (##)"
-                          onClick={() => applyMarkdownLine(idx, "## ")}
-                        >
-                          <span className="text-xs font-semibold">H2</span>
-                        </ToolbarButton>
-                        <ToolbarButton
-                          label="Daftar"
-                          title="Daftar berbutir (-)"
-                          onClick={() => applyMarkdownLine(idx, "- ")}
-                        >
-                          <span className="text-xs">•</span>
-                        </ToolbarButton>
-                        <ToolbarButton
-                          label="Tautan"
-                          title="Tautan ([teks](url))"
-                          onClick={() =>
-                            applyMarkdownWrap(
-                              idx,
-                              "[",
-                              "](https://)",
-                              "teks tautan",
-                            )
-                          }
-                        >
-                          <span className="text-xs underline">Tautan</span>
-                        </ToolbarButton>
-                        <span className="ml-auto pr-1 text-[10px] text-muted-foreground">
-                          Markdown
-                        </span>
-                      </div>
-
-                      <div
-                        className={
-                          previewBagian === idx
-                            ? "grid gap-3 lg:grid-cols-2"
-                            : ""
-                        }
-                      >
-                        <textarea
-                          ref={(el) => {
-                            bagianRefs.current[idx] = el;
-                          }}
-                          rows={previewBagian === idx ? 18 : 16}
-                          value={b.konten || ""}
-                          onChange={(e) =>
-                            handleBagianChange(idx, "konten", e.target.value)
-                          }
-                          placeholder="Tuliskan isi edukasi. Pilih teks lalu gunakan tombol di atas untuk menebalkan, membuat subjudul, daftar, atau tautan."
-                          className="w-full rounded-md border border-border bg-background p-3 text-sm font-sans text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
-                        />
-                        {previewBagian === idx && (
-                          <div className="rounded-md border border-border bg-background/50 p-3">
-                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              Pratinjau
-                            </p>
-                            {b.konten ? (
-                              <ArticleProse>{b.konten}</ArticleProse>
-                            ) : (
-                              <p className="text-xs italic text-muted-foreground">
-                                Belum ada konten untuk ditampilkan.
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                {/* Status + indikator perubahan belum tersimpan */}
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={artikelStatus}
+                      onChange={(e) =>
+                        setArtikelStatus(e.target.value as ArtikelStatus)
+                      }
+                      disabled={artikelSaving}
+                      className="rounded-lg border border-border bg-background px-3.5 py-2 text-base sm:text-sm text-ink outline-none focus:border-pine focus:ring-1 focus:ring-pine"
+                    >
+                      <option value="draft">Draft (sembunyikan dari publik)</option>
+                      <option value="terbit">Terbit (tampilkan ke publik)</option>
+                    </select>
                   </div>
-                ))}
+                  <div className="flex items-center gap-2 pb-1">
+                    {artikelDirty && (
+                      <span className="text-[11px] font-medium text-amber-600">
+                        Belum disimpan
+                      </span>
+                    )}
+                    <span className="text-[11px] text-muted-foreground">
+                      Maks. 200 KB
+                    </span>
+                  </div>
+                </div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleAddBagian}
-                  className="w-full border-dashed border-2 hover:border-pine hover:bg-pine/5 text-pine text-xs py-3"
-                >
-                  + Tambah Bagian / Seksi Baru
-                </Button>
+                <ArtikelEditor
+                  value={artikelKonten}
+                  onChange={setArtikelKonten}
+                  disabled={artikelSaving}
+                />
+
+                {artikelTooLarge && (
+                  <p role="alert" className="text-xs text-red-600">
+                    Ukuran konten melebihi 200 KB. Kecilkan atau hapus sebagian
+                    gambar/teks sebelum menyimpan.
+                  </p>
+                )}
+                {artikelError && (
+                  <p
+                    role="alert"
+                    className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700"
+                  >
+                    {artikelError}
+                  </p>
+                )}
+                {artikelEmpty && !artikelError && (
+                  <p className="text-xs text-muted-foreground">
+                    Konten masih kosong — tombol Simpan aktif setelah ada teks.
+                  </p>
+                )}
               </div>
 
               {/* Referensi — URL sumber penyakit, ditampilkan di bagian "Referensi"
@@ -1722,19 +1521,21 @@ export default function Admin() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setSelectedArtikel(null);
-                    setEditMode("artikel");
-                  }}
+                  onClick={() => keluarArtikel("artikel")}
                 >
                   Batal
                 </Button>
                 <Button
                   type="submit"
-                  disabled={loading}
+                  disabled={
+                    artikelSaving ||
+                    artikelEmpty ||
+                    artikelTooLarge ||
+                    !artikelDirty
+                  }
                   className="bg-pine text-white hover:bg-pine/90"
                 >
-                  {loading ? "Menyimpan..." : "Simpan Semua Bagian"}
+                  {artikelSaving ? "Menyimpan..." : "Simpan Artikel"}
                 </Button>
               </div>
             </form>

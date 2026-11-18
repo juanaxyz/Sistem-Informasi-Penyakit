@@ -17,6 +17,7 @@ import AnalysisDetailPage from "./pages/AnalysisDetailPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Dock from "./react-bits/components/Dock";
 import AdminPage from "./pages/Admin";
+import { ChecksPage } from "./pages/ChecksPage";
 import { PatogenDetailPage } from "./pages/PatogenDetailPage";
 
 import { House, ScanSearch, ScanLine } from "lucide-react";
@@ -88,6 +89,8 @@ export default function App() {
            <Route path="/patogen/:id" element={<PatogenDetailPage />} />
            {/* Admin route - protected for admin role only */}
            <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminPage /></ProtectedRoute>} />
+           {/* Dev-only: pengecekan editor Quill & sanitizer. */}
+           <Route path="/checks" element={<ChecksPage />} />
            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

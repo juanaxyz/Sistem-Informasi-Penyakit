@@ -1,73 +1,40 @@
-import Markdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeSlug from "rehype-slug";
-import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import { useEffect, useRef } from "react";
+import { sanitizeArtikelHtml, type TocItem } from "@/lib/artikel";
+
+export type { TocItem };
 
 type ArticleProseProps = {
-  /** Sumber Markdown yang sudah disimpan (isi `artikel_bagian.konten`). */
+  /** HTML artikel hasil editor Quill (akan disanitasi lagi di klien). */
   children: string;
-  /** Override per-elemen, dipakai halaman detail untuk merapikan tabel. */
-  components?: Components;
   className?: string;
-  /** Enable table of contents generation */
-  enableToc?: boolean;
-  /** Callback when TOC is generated */
+  /** Callback ketika daftar isi (dari <h2>/<h3>) berhasil dibangun. */
   onTocChange?: (toc: TocItem[]) => void;
 };
 
-export type TocItem = {
-  id: string;
-  text: string;
-  level: number;
-};
-
-function extractToc(content: string): TocItem[] {
-  const headingRegex = /^#{2,3}\s+(.+)$/gm;
-  const toc: TocItem[] = [];
-  let match;
-  while ((match = headingRegex.exec(content)) !== null) {
-    const level = match[0].match(/^#+/)?.[0].length ?? 2;
-    const text = match[1].trim();
-    const id = text
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, "")
-      .replace(/\s+/g, "-");
-    toc.push({ id, text, level });
-  }
-  return toc;
-}
-
-export function ArticleProse({
-  children,
-  components,
-  className,
-  enableToc = false,
-  onTocChange,
-}: ArticleProseProps) {
-  const tocRef = useRef<TocItem[]>([]);
+/**
+ * Render HTML artikel aman: DOMPurify hanya mengizinkan tag/atribut kontrak
+ * (pertahanan berlapis; backend tetap sumber kebenaran saat menyimpan).
+ * Styling pakai `.article-prose` (index.css) yang juga dipakai editor Quill
+ * supaya tampilan publik sama dengan di editor.
+ */
+export function ArticleProse({ children, className, onTocChange }: ArticleProseProps) {
+  const tocKeyRef = useRef("");
+  const { html, toc } = sanitizeArtikelHtml(children ?? "");
+  // Bandingkan kunci id agar onTocChange tidak memicu loop render.
+  const tocKey = toc.map((t) => `${t.id}@${t.level}`).join("|");
 
   useEffect(() => {
-    if (enableToc) {
-      const toc = extractToc(children);
-      tocRef.current = toc;
+    if (tocKey !== tocKeyRef.current) {
+      tocKeyRef.current = tocKey;
       onTocChange?.(toc);
     }
-  }, [children, enableToc, onTocChange]);
+  }, [tocKey, toc, onTocChange]);
 
   return (
-    <div className={className ? `article-prose ${className}` : "article-prose"}>
-      <Markdown
-        remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
-        rehypePlugins={[
-          rehypeSlug,
-          [rehypeAutolinkHeadings, { behavior: "wrap" }],
-        ]}
-        components={components}
-      >
-        {children}
-      </Markdown>
-    </div>
+    <div
+      className={className ? `article-prose ${className}` : "article-prose"}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 

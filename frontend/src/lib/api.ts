@@ -1,7 +1,10 @@
 import type {
   AnalysisTypeRecord,
-  ArtikelBagian,
+  ArtikelDetail,
+  ArtikelPayload,
+  ArtikelSaveResponse,
   ArtikelSummary,
+  ArtikelUploadResponse,
   AuthResponse,
   BodyPartRecord,
   ChatResult,
@@ -208,10 +211,21 @@ export const api = {
     getArtikelList: () => get<{ artikel: ArtikelSummary[] }>("/api/artikel"),
     createArtikel: (idPenyakit: number) =>
       post<{ artikel: ArtikelSummary }>("/api/artikel", { id_penyakit: idPenyakit }),
-    getArtikelBagian: (idArtikel: number) =>
-      get<{ bagian: ArtikelBagian[] }>(`/api/artikel/${idArtikel}/bagian`),
-    saveArtikelBagian: (idArtikel: number, bagian: ArtikelBagian[]) =>
-      put<{ bagian: ArtikelBagian[] }>(`/api/artikel/${idArtikel}/bagian`, { bagian }),
+    /** Muat satu artikel per id penyakit (konten HTML tersanitasi backend). */
+    getArtikel: (idPenyakit: number) =>
+      get<ArtikelDetail>(`/api/artikel/${idPenyakit}`),
+    /** Simpan konten HTML + status artikel. */
+    updateArtikel: (idPenyakit: number, payload: ArtikelPayload) =>
+      put<ArtikelSaveResponse>(`/api/artikel/${idPenyakit}`, payload),
+    /** Upload gambar artikel; field multipart "gambar". */
+    uploadGambarArtikel: (file: File) => {
+      const form = new FormData();
+      form.append("gambar", file);
+      return postForm<ArtikelUploadResponse>(
+        "/api/artikel/upload-gambar",
+        form,
+      );
+    },
     getDiseaseDetailById: (id: number) =>
       get<{ penyakit: DiseaseDetail }>(`/api/penyakit/${id}`),
     getDiseaseDetailBySlug: (slug: string) =>
