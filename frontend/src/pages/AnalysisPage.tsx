@@ -4,6 +4,7 @@ import { useBodyParts } from "../hooks/useBodyParts";
 import { useSystemsByBodyPart } from "../hooks/useSystemsByBodyPart";
 import { useAnalysesByBodyPart } from "../hooks/useAnalysesByBodyPart";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import type { AnalysisTypeRecord, Prediction } from "@/lib/types";
 import {
   ArrowRight,
   Check,
+  LogIn,
   ScanLine,
   Trash2,
   Upload,
@@ -157,6 +159,8 @@ function AnalyzePage({
   const [riwayatId, setRiwayatId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { user } = useAuth();
 
   const currentStep = file == null ? 0 : analyzed ? 2 : 1;
 
@@ -208,6 +212,11 @@ function AnalyzePage({
 
   const handleUpload = async () => {
     if (!file) return;
+    // Simpan riwayat analisis butuh akun; tampilkan login dulu kalau belum masuk.
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
     setError(null);
     setUploading(true);
     try {
@@ -481,6 +490,61 @@ function AnalyzePage({
           className="mt-6 rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700"
         >
           {error}
+        </div>
+      )}
+
+      {showLoginModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="login-required-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={() => setShowLoginModal(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span
+              aria-hidden="true"
+              className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-pine/10 text-pine"
+            >
+              <LogIn className="h-5 w-5" />
+            </span>
+            <h2
+              id="login-required-title"
+              className="mt-4 text-center font-display text-lg font-semibold text-ink"
+            >
+              Masuk untuk menyimpan analisis
+            </h2>
+            <p className="mt-2 text-center text-sm text-muted-foreground leading-relaxed">
+              Hasil analisis disimpan ke riwayat akun Anda agar bisa dilihat
+              kembali. Masuk atau daftar dulu, ya — gambar yang sudah dipilih
+              tetap ada.
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <Button
+                onClick={() => navigate("/login", { state: { from: { pathname: "/analisis" } } })}
+                className="w-full bg-pine text-white hover:bg-pine/90"
+              >
+                Masuk
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate("/register")}
+                className="w-full"
+              >
+                Daftar akun baru
+              </Button>
+              <button
+                type="button"
+                onClick={() => setShowLoginModal(false)}
+                className="mt-1 text-xs text-muted-foreground hover:text-ink transition"
+              >
+                Nanti saja
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -83,14 +83,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/body-map" element={<BodyMapPage />} />
-            <Route
-              path="/analisis"
-              element={
-                <ProtectedRoute>
-                  <AnalysisPage />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/analisis" element={<AnalysisPage />} />
             {/* Riwayat */}
             <Route
               path="/riwayat"
