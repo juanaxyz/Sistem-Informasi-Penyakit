@@ -212,15 +212,23 @@ def ingest_article(id_artikel: int, log=print) -> dict:
                     }
                 )
 
-        summary = _sync_sources(conn, tokenizer, planned, log)
+        summary = _sync_sources(conn, tokenizer, planned, log, prune_missing=False)
         summary["id_artikel"] = id_artikel
         summary["chunk_tokens"] = CHUNK_TOKENS
         summary["durasi_detik"] = round(time.perf_counter() - started, 2)
         return summary
 
 
-def _sync_sources(conn, tokenizer, planned: list[dict], log) -> dict:
-    """Tulis rencana chunk ke DB: embed hanya yang berubah, hapus yang basi."""
+def _sync_sources(
+    conn, tokenizer, planned: list[dict], log, prune_missing: bool = True
+) -> dict:
+    """Tulis rencana chunk ke DB: embed hanya yang berubah, hapus yang basi.
+
+    `prune_missing=True` (untuk run_ingest) menghapus seluruh chunk sumber yang
+    tidak ada di `planned`. `ingest_article` memproses satu artikel saja dan
+    harus mengirim `prune_missing=False`, sebab `planned` tidak pernah berisi
+    sumber lain — pemangkasan di sini akan menghapus seluruh basis pengetahuan.
+    """
     stored = _stored_chunks(conn)
 
     by_source: dict[tuple[str, int], list[dict]] = {}
@@ -251,12 +259,14 @@ def _sync_sources(conn, tokenizer, planned: list[dict], log) -> dict:
 
     with conn.transaction():
         # Sumber yang hilang dari DB -> hapus seluruh chunk-nya.
-        for key in stored:
-            if key not in by_source:
-                conn.execute(
-                    "DELETE FROM knowledge_embeddings WHERE source_type = %s AND source_id = %s",
-                    key,
-                )
+        # Hanya untuk sinkronisasi penuh; lihat docstring fungsi ini.
+        if prune_missing:
+            for key in stored:
+                if key not in by_source:
+                    conn.execute(
+                        "DELETE FROM knowledge_embeddings WHERE source_type = %s AND source_id = %s",
+                        key,
+                    )
         # Artikel makin pendek -> hapus ekor chunk_index yang tak lagi ada.
         for key, pieces in by_source.items():
             wanted = max(p["chunk_index"] for p in pieces) + 1
@@ -327,6 +337,8 @@ def _sync_sources(conn, tokenizer, planned: list[dict], log) -> dict:
         "chunk_terembed": len(to_embed),
         "sumber_berubah": changed_sources,
         "sumber_tidak_berubah": len(by_source) - changed_sources,
-        "sumber_dihapus": len([k for k in stored if k not in by_source]),
+        "sumber_dihapus": (
+            len([k for k in stored if k not in by_source]) if prune_missing else 0
+        ),
         "model": EMBEDDING_MODEL,
     }
